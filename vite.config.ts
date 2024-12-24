@@ -9,6 +9,5 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: 'https://haneumc.github.io/moodleGrading2.0.1/',
 })
 
