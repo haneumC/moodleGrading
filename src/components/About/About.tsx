@@ -109,13 +109,13 @@ const AboutPage = () => {
                   Calvin University Computer Science Department
                 </a>
                 <a 
-                  href="https://pnp3.github.io/MoodleGradingApp/"
+                  href="https://docs.google.com/presentation/d/1MEL32Qm0tjnPkIvgqQYHQpw7zKYMxVQCN7qEuTE4orc/edit?usp=sharing"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-2 text-blue-400 hover:text-blue-300 text-xl"
                 >
                   <Link size={20} />
-                  Project Demo
+                  Status Report Presentation
                 </a>
               </div>
             </CardContent>
