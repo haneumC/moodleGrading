@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import './App.css';
 import Feedback from './components/Feedback/Feedback';
 import StudentList from './components/StudentList/StudentList';
+import { HashRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
+import AboutPage from './components/About/About';
 
 interface Student {
   name: string;
@@ -24,7 +26,8 @@ interface ApplyFeedbackParams {
   allFeedbackItems: FeedbackItem[];
 }
 
-const App: React.FC = () => {
+const MainApp = () => {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
 
@@ -130,11 +133,19 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="grading-assistant">
+    <div className="grading-assistant relative">
+      <button 
+        onClick={() => navigate('/about')}
+        className="absolute top-4 right-4 text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors"
+      >
+        About Us
+      </button>
       <header>
-        <h1>Grading Assistant</h1>
-        <p>Assignment Name: Assignment 1</p>
-        <p>Max Points: 20.00</p>
+        <div>
+          <h1>Grading Assistant</h1>
+          <p>Assignment Name: Assignment 1</p>
+          <p>Max Points: 20.00</p>
+        </div>
       </header>
       <main>
         <div className="left">
@@ -162,6 +173,17 @@ const App: React.FC = () => {
         </div>
       </main>
     </div>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/" element={<MainApp />} />
+      </Routes>
+    </Router>
   );
 };
 
