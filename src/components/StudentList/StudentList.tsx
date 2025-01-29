@@ -82,22 +82,7 @@ const StudentList: React.FC<StudentListProps> = ({
     getSortedRowModel: getSortedRowModel(),
   });
 
-  const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setStudents([]);
-      setError("");
-      
-      const fileReader = new FileReader();
-      fileReader.onload = (event) => {
-        const text = event.target?.result as string;
-        validateCSV(text);
-      };
-      fileReader.readAsText(file);
-    }
-  };
-
-  const validateCSV = (csvString: string) => {
+  const validateCSV = (csvString: string): boolean => {
     try {
       const result = Papa.parse(csvString, {
         header: false,
@@ -106,7 +91,7 @@ const StudentList: React.FC<StudentListProps> = ({
 
       if (result.errors.length > 0) {
         setError("Error parsing the CSV file.");
-        return;
+        return false;
       }
 
       const output = result.data as string[][];
@@ -122,7 +107,7 @@ const StudentList: React.FC<StudentListProps> = ({
       const missingHeaders = requiredHeaders.filter((header) => !headerRow.includes(header));
       if (missingHeaders.length > 0) {
         setError(`Missing required columns: ${missingHeaders.join(", ")}`);
-        return;
+        return false;
       }
 
       const parsedStudents = output.slice(1).map((row: string[]) => {
@@ -142,22 +127,108 @@ const StudentList: React.FC<StudentListProps> = ({
 
       if (invalidStudents.length > 0) {
         setError("Some rows contain missing or invalid data.");
-        return;
+        return false;
       }
 
-      setStudents(
-        parsedStudents.map((student) => ({
-          name: student["Full name"] || "",
-          email: student["Email address"] || "",
-          timestamp: student["Last modified (submission)"] || "",
-          grade: student["Grade"] || "",
-          feedback: student["Feedback comments"] || "",
-          appliedIds: [],
-        }))
-      );
-      setError("");
-    } catch (error) {
+      return true;
+    } catch (_) {
       setError("Error parsing the CSV file.");
+      return false;
+    }
+  };
+
+  const processCSVData = (csvString: string) => {
+    const result = Papa.parse(csvString, {
+      header: false,
+      skipEmptyLines: true
+    });
+    
+    const output = result.data as string[][];
+    const headerRow: string[] = output[0];
+    
+    const parsedStudents = output.slice(1).map((row: string[]) => {
+      const student: Record<string, string> = {};
+      headerRow.forEach((header: string, index: number) => {
+        student[header] = row[index] || "";
+      });
+      return student;
+    });
+
+    setStudents(
+      parsedStudents.map((student) => ({
+        name: student["Full name"] || "",
+        email: student["Email address"] || "",
+        timestamp: student["Last modified (submission)"] || "",
+        grade: student["Grade"] || "",
+        feedback: student["Feedback comments"] || "",
+        appliedIds: [],
+      }))
+    );
+  };
+
+  const handleOnChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setStudents([]);
+      setError("");
+      
+      const fileReader = new FileReader();
+      fileReader.onload = (event) => {
+        const text = event.target?.result as string;
+        if (validateCSV(text)) {
+          processCSVData(text);
+          setError("");
+        }
+      };
+      fileReader.readAsText(file);
+    }
+  };
+
+  const exportForMoodle = () => {
+    try {
+      // Prompt user for filename
+      let filename = prompt("Enter filename for export:", "moodle_grades.csv");
+      if (!filename) return; // User cancelled the prompt
+      
+      // Ensure filename ends with .csv
+      if (!filename.toLowerCase().endsWith('.csv')) {
+        filename += '.csv';
+      }
+      
+      // Create will-be-exported CSV content
+      const csvRows = [
+        [
+          "Full name",
+          "Email address",
+          "Last modified (submission)",
+          "Grade",
+          "Feedback comments"
+        ],
+        // Data rows
+        ...students.map(student => [
+          student.name,
+          student.email,
+          student.timestamp,
+          student.grade,
+          student.feedback
+        ])
+      ];
+      
+      const csvContent = Papa.unparse(csvRows);
+      
+      // Create and download the file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url); // Clean up the URL object
+    } catch (error) {
+      setError("Error exporting the CSV file.");
     }
   };
 
@@ -177,7 +248,12 @@ const StudentList: React.FC<StudentListProps> = ({
               className="import-file-input"
             />
           </form>
-          <button className="studentBtn">Export for Moodle</button>
+          <button 
+            className="studentBtn" 
+            onClick={exportForMoodle}
+          >
+            Export for Moodle
+          </button>
           <button className="studentBtn">Save Progress</button>
           <button className="studentBtn">Load Progress</button>
         </div>
