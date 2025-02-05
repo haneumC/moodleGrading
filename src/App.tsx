@@ -30,6 +30,7 @@ const MainApp = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [assignmentName, setAssignmentName] = useState<string>("Assignment 1");
 
   // State to manage all feedback items
   const [feedbackItems] = useState<FeedbackItem[]>([]);
@@ -143,19 +144,17 @@ const MainApp = () => {
       <header>
         <div>
           <h1>Grading Assistant</h1>
-          <p>Assignment Name: Assignment 1</p>
+          <input
+            type="text"
+            value={assignmentName}
+            onChange={(e) => setAssignmentName(e.target.value)}
+            className="text-lg font-semibold px-2 py-1 border rounded"
+          />
           <p>Max Points: 20.00</p>
         </div>
       </header>
       <main>
         <div className="left">
-          <div className="controls">
-            <button>Prev Student</button>
-            <button>Next Student</button>
-            <button>Show Stats</button>
-            <button>Import Table</button>
-            <button>Export Table</button>
-          </div>
           <Feedback
             onApplyFeedback={handleApplyFeedback}
             selectedStudent={selectedStudent}
@@ -169,6 +168,7 @@ const MainApp = () => {
             setStudents={setStudents}
             selectedStudent={selectedStudent}
             onStudentSelect={handleStudentSelect}
+            assignmentName={assignmentName}
           />
         </div>
       </main>

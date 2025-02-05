@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import './StudentList.css';
+import { saveAs } from 'file-saver';
 
 // Define Student type
 interface Student {
@@ -34,13 +35,15 @@ interface StudentListProps {
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   selectedStudent: string | null;
   onStudentSelect: (studentName: string) => void;
+  assignmentName: string;
 }
 
 const StudentList: React.FC<StudentListProps> = ({
   students,
   setStudents,
   selectedStudent,
-  onStudentSelect
+  onStudentSelect,
+  assignmentName
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [error, setError] = useState<string>("");
@@ -186,16 +189,13 @@ const StudentList: React.FC<StudentListProps> = ({
 
   const exportForMoodle = () => {
     try {
-      // Prompt user for filename
-      let filename = prompt("Enter filename for export:", "moodle_grades.csv");
-      if (!filename) return; // User cancelled the prompt
-      
-      // Ensure filename ends with .csv
-      if (!filename.toLowerCase().endsWith('.csv')) {
-        filename += '.csv';
+      // Check if there are any students
+      if (students.length === 0) {
+        setError("No CSV imported");
+        return;
       }
-      
-      // Create will-be-exported CSV content
+
+      // Create CSV content
       const csvRows = [
         [
           "Full name",
@@ -216,17 +216,11 @@ const StudentList: React.FC<StudentListProps> = ({
       
       const csvContent = Papa.unparse(csvRows);
       
-      // Create and download the file
+      // Create blob and save file using FileSaver
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', filename);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url); // Clean up the URL object
+      const defaultFilename = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_grades.csv`;
+      
+      saveAs(blob, defaultFilename);
     } catch (error) {
       setError("Error exporting the CSV file.");
     }

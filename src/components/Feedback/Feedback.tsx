@@ -10,6 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 interface FeedbackItem {
   id: number;
@@ -273,7 +274,7 @@ const Feedback: React.FC<FeedbackProps> = ({ onApplyFeedback, selectedStudent, a
                       onClick={() => handleDeleteFeedback(item.id)}
                       className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent"
                     >
-                      ×
+                      <i className="bi bi-trash"></i>
                     </Button>
                   </TableCell>
                 </>
