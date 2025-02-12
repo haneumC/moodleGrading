@@ -14,16 +14,17 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 20px;
+  gap: 20px;
 }
 
 .studentBtn {
+  flex: 0.8;
   padding: 10px 20px;
   background-color: #4a5dab;
   color: #fff;
   border: none;
   border-radius: 5px;
   cursor: pointer;
-  margin-right: 10px;
 }
 
 .studentBtn:hover {
@@ -40,7 +41,7 @@
 
 .header-row {
   background-color: #878787 !important;
-  transition: none !important;
+  color: white;
 }
 
 .header-row:hover {
@@ -48,7 +49,10 @@
 }
 
 .header-cell {
-  color: white;
+  color: white !important;
+  padding: 12px;
+  font-weight: 500;
+  font-size: 1.1rem !important;
 }
 
 .header-cell:hover {
@@ -57,12 +61,41 @@
 }
 
 .table-container {
-  max-height: 600px;
+  background-color: #3d3c3f;
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 70vh;
+}
+
+.table-container tbody {
+  display: block;
   overflow-y: auto;
+  max-height: calc(70vh - 50px);
+}
+
+.table-container thead,
+.table-container tbody tr {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+.table-container thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.table-container th,
+.table-container td {
+  width: 20%;
+  padding: 12px;
+  font-size: 1rem;
 }
 
 .table-container table {
   width: 100%;
+  border-collapse: collapse;
 }
 
 .table-container::-webkit-scrollbar {
@@ -93,6 +126,7 @@
 
 /*"fake" import button*/
 .import-file-label {
+  flex: 0.8;
   background-color: #4a5dab;
   color: white;
   padding: 10px 20px;
@@ -100,7 +134,6 @@
   cursor: pointer;
   text-align: center;
   display: inline-block;
-  margin-right: 10px;
 }
 
 .import-file-label:hover {
@@ -113,4 +146,11 @@
 
 .table-cell {
   white-space: pre-wrap;
+}
+
+caption {
+  color: #878787;
+  padding: 12px;
+  text-align: center;
+  font-size: 1.1rem;
 }
