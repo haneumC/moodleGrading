@@ -12,7 +12,7 @@ window.addEventListener('load', () => {
       newBtn.style = 'margin-left: 0.5rem; height: 36px; vertical-align: top;';
       
       newBtn.onclick = function() {
-        window.open('YOUR_DEPLOYED_APP_URL', '_blank');
+        window.open('https://haneumc.github.io/moodleGrading/', '_blank');
       };
   
       // Insert the button after the select element
