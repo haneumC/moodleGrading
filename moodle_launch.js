@@ -1,18 +1,22 @@
 window.addEventListener('load', () => {
-  // Find the reference button (same as in original example)
-  const learningModeBtn = document.getElementById('report-roster-toggle');
+    // Look for the grading action area with the dropdown
+    const gradingActionLabel = document.querySelector('label:contains("Grading action")');
+    // Or try to find the select element directly
+    const selectElement = document.querySelector('.custom-select[data-init-value]');
+    
+    if (selectElement || gradingActionLabel) {
+      const newBtn = document.createElement('button');
+      newBtn.innerHTML = "Open Moodle Grading";
+      // Match Moodle's styling
+      newBtn.className = 'btn btn-secondary custom-select';
+      newBtn.style = 'margin-left: 0.5rem; height: 36px; vertical-align: top;';
+      
+      newBtn.onclick = function() {
+        window.open('YOUR_DEPLOYED_APP_URL', '_blank');
+      };
   
-  // Create new button
-  const newBtn = document.createElement('button');
-  newBtn.innerHTML = "Open Moodle Grading";
-  newBtn.style = 'margin-left: 1rem';
-  
-  // Add click handler to open the webpage
-  newBtn.onclick = function() {
-    window.open('https://haneumc.github.io/moodleGrading/', '_blank');
-    // '_blank' opens in new tab. Use '_self' to open in same window
-  };
-
-  // Insert button after the reference button
-  learningModeBtn.parentNode.insertBefore(newBtn, learningModeBtn.nextSibling);
-});
+      // Insert the button after the select element
+      const targetElement = selectElement || gradingActionLabel.nextElementSibling;
+      targetElement.parentNode.insertBefore(newBtn, targetElement.nextSibling);
+    }
+  });
