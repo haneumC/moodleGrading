@@ -50,12 +50,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             console.log('Collected students:', students); // Debug log
 
-            // Store data in localStorage
-            localStorage.setItem('moodleStudentData', JSON.stringify(students));
-            console.log('Stored in localStorage:', localStorage.getItem('moodleStudentData')); // Debug log
-
-            // Open the webapp in a new tab
-            window.open('https://haneumc.github.io/moodleGrading/', '_blank', 'noopener');
+            // Encode the data as a URL parameter
+            const encodedData = encodeURIComponent(JSON.stringify(students));
+            
+            // Open the webapp with the data in URL
+            window.open(`https://haneumc.github.io/moodleGrading/#/import?data=${encodedData}`, '_blank', 'noopener');
         });
 
         newBtn.style.cssText = `

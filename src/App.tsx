@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import './App.css';
 import Feedback from './components/Feedback/Feedback';
 import StudentList from './components/StudentList/StudentList';
-import { HashRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
+import { HashRouter as Router, Route, Routes, useNavigate, useSearchParams } from 'react-router-dom';
 import AboutPage from './components/About/About';
 
 interface Student {
@@ -176,11 +176,38 @@ const MainApp = () => {
   );
 };
 
+const ImportRoute = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const setStudents = useContext(/* your students context */);
+
+  useEffect(() => {
+    const data = searchParams.get('data');
+    if (data) {
+      try {
+        const students = JSON.parse(decodeURIComponent(data));
+        setStudents(students.map(student => ({
+          ...student,
+          timestamp: new Date().toISOString(),
+          feedback: "",
+          appliedIds: [],
+        })));
+        navigate('/'); // Redirect to main page after importing
+      } catch (e) {
+        console.error('Error importing data:', e);
+      }
+    }
+  }, [searchParams, navigate, setStudents]);
+
+  return <div>Importing data...</div>;
+};
+
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/import" element={<ImportRoute />} />
         <Route path="/" element={<MainApp />} />
       </Routes>
     </Router>
