@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, createContext } from 'react';
 import './App.css';
 import Feedback from './components/Feedback/Feedback';
 import StudentList from './components/StudentList/StudentList';
@@ -25,6 +25,8 @@ interface ApplyFeedbackParams {
   feedbackItem: FeedbackItem;
   allFeedbackItems: FeedbackItem[];
 }
+
+const StudentsContext = createContext<React.Dispatch<React.SetStateAction<Student[]>>>(() => {});
 
 const MainApp = () => {
   const navigate = useNavigate();
@@ -134,59 +136,61 @@ const MainApp = () => {
   };
 
   return (
-    <div className="grading-assistant relative">
-      <button 
-        onClick={() => navigate('/about')}
-        className="absolute top-4 right-4 text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors"
-      >
-        About Us
-      </button>
-      <header>
-        <div>
-          <h1>Grading Assistant</h1>
-          <input
-            type="text"
-            value={assignmentName}
-            onChange={(e) => setAssignmentName(e.target.value)}
-            className="text-lg font-semibold px-2 py-1 border rounded"
-          />
-          <p>Max Points: 20.00</p>
-        </div>
-      </header>
-      <main>
-        <div className="left">
-          <Feedback
-            onApplyFeedback={handleApplyFeedback}
-            selectedStudent={selectedStudent}
-            appliedIds={students.find(s => s.name === selectedStudent)?.appliedIds || []}
-            onFeedbackEdit={handleFeedbackEdit}
-          />
-        </div>
-        <div className="right">
-          <StudentList
-            students={students}
-            setStudents={setStudents}
-            selectedStudent={selectedStudent}
-            onStudentSelect={handleStudentSelect}
-            assignmentName={assignmentName}
-          />
-        </div>
-      </main>
-    </div>
+    <StudentsContext.Provider value={setStudents}>
+      <div className="grading-assistant relative">
+        <button 
+          onClick={() => navigate('/about')}
+          className="absolute top-4 right-4 text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors"
+        >
+          About Us
+        </button>
+        <header>
+          <div>
+            <h1>Grading Assistant</h1>
+            <input
+              type="text"
+              value={assignmentName}
+              onChange={(e) => setAssignmentName(e.target.value)}
+              className="text-lg font-semibold px-2 py-1 border rounded"
+            />
+            <p>Max Points: 20.00</p>
+          </div>
+        </header>
+        <main>
+          <div className="left">
+            <Feedback
+              onApplyFeedback={handleApplyFeedback}
+              selectedStudent={selectedStudent}
+              appliedIds={students.find(s => s.name === selectedStudent)?.appliedIds || []}
+              onFeedbackEdit={handleFeedbackEdit}
+            />
+          </div>
+          <div className="right">
+            <StudentList
+              students={students}
+              setStudents={setStudents}
+              selectedStudent={selectedStudent}
+              onStudentSelect={handleStudentSelect}
+              assignmentName={assignmentName}
+            />
+          </div>
+        </main>
+      </div>
+    </StudentsContext.Provider>
   );
 };
 
 const ImportRoute = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const setStudents = useContext(/* your students context */);
+  const setStudents = useContext(StudentsContext);
 
   useEffect(() => {
     const data = searchParams.get('data');
     if (data) {
       try {
         const students = JSON.parse(decodeURIComponent(data));
-        setStudents(students.map(student => ({
+        setStudents(students.map((student: Student) => ({
           ...student,
           timestamp: new Date().toISOString(),
           feedback: "",
