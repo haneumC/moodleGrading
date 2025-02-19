@@ -1,15 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Student } from '../types';
-
-// Create an interface for the raw student data
-interface RawStudentData {
-  name: string;
-  email: string;
-  status: string;
-  grade: string;
-}
 
 export const useCSVHandling = (
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>,
@@ -17,28 +9,6 @@ export const useCSVHandling = (
   students: Student[]
 ) => {
   const [error, setError] = useState<string>("");
-
-  useEffect(() => {
-    const moodleData = localStorage.getItem('moodleStudentData');
-    if (moodleData) {
-      try {
-        const parsedData = JSON.parse(moodleData) as RawStudentData[];
-        const formattedStudents: Student[] = parsedData.map((student) => ({
-          name: student.name,
-          email: student.email,
-          timestamp: new Date().toISOString(),
-          grade: student.grade || "",
-          feedback: "",
-          appliedIds: [],
-        }));
-        
-        setStudents(formattedStudents);
-        localStorage.removeItem('moodleStudentData');
-      } catch {
-        setError("Error processing Moodle data");
-      }
-    }
-  }, [setStudents]);
 
   const validateCSV = (csvString: string): boolean => {
     try {
@@ -69,7 +39,7 @@ export const useCSVHandling = (
       }
 
       return true;
-    } catch {
+    } catch (_) {
       setError("Error parsing the CSV file.");
       return false;
     }
@@ -151,7 +121,7 @@ export const useCSVHandling = (
       const defaultFilename = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_grades.csv`;
       
       saveAs(blob, defaultFilename);
-    } catch {
+    } catch (error) {
       setError("Error exporting the CSV file.");
     }
   };
