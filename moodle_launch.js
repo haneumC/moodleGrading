@@ -9,7 +9,7 @@ window.addEventListener('load', () => {
   
   // Add click handler to open the webpage
   newBtn.onclick = function() {
-    window.open('YOUR_MOODLE_GRADING_URL', '_blank');
+    window.open('https://haneumc.github.io/moodleGrading/', '_blank');
     // '_blank' opens in new tab. Use '_self' to open in same window
   };
 
