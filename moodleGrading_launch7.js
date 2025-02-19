@@ -20,14 +20,23 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Collect data from the table
             const students = [];
-            const rows = document.querySelectorAll('table tbody tr');
+            const rows = document.querySelectorAll('.generaltable tbody tr');
             
+            console.log('Found rows:', rows.length); // Debug log
+
             rows.forEach(row => {
                 const nameCell = row.querySelector('td:nth-child(3)');
                 const emailCell = row.querySelector('td:nth-child(4)');
                 const statusCell = row.querySelector('td:nth-child(5)');
                 const gradeCell = row.querySelector('td:nth-child(6)');
                 
+                console.log('Row cells:', { // Debug log
+                    name: nameCell?.textContent,
+                    email: emailCell?.textContent,
+                    status: statusCell?.textContent,
+                    grade: gradeCell?.textContent
+                });
+
                 if (nameCell && emailCell) {
                     const studentData = {
                         name: nameCell.textContent?.trim() || '',
@@ -39,8 +48,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
 
+            console.log('Collected students:', students); // Debug log
+
             // Store data in localStorage
             localStorage.setItem('moodleStudentData', JSON.stringify(students));
+            console.log('Stored in localStorage:', localStorage.getItem('moodleStudentData')); // Debug log
 
             // Open the webapp in a new tab
             window.open('https://haneumc.github.io/moodleGrading/', '_blank', 'noopener');
