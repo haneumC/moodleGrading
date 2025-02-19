@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Student } from '../types';
@@ -9,6 +9,28 @@ export const useCSVHandling = (
   students: Student[]
 ) => {
   const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    const moodleData = localStorage.getItem('moodleStudentData');
+    if (moodleData) {
+      try {
+        const parsedData = JSON.parse(moodleData);
+        const formattedStudents: Student[] = parsedData.map((student: any) => ({
+          name: student.name,
+          email: student.email,
+          timestamp: new Date().toISOString(),
+          grade: student.grade || "",
+          feedback: "",
+          appliedIds: [],
+        }));
+        
+        setStudents(formattedStudents);
+        localStorage.removeItem('moodleStudentData');
+      } catch (e) {
+        setError("Error processing Moodle data");
+      }
+    }
+  }, [setStudents]);
 
   const validateCSV = (csvString: string): boolean => {
     try {

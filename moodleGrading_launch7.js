@@ -10,12 +10,42 @@ document.addEventListener('DOMContentLoaded', function() {
       const targetElement = gradingActionLabel || chooseDropdown;
       
       if (targetElement) {
-        const newBtn = document.createElement('a'); // Using anchor instead of button
+        const newBtn = document.createElement('a');
         newBtn.innerHTML = "Open Moodle Grading";
         newBtn.className = 'btn btn-primary';
-        newBtn.href = 'https://haneumc.github.io/moodleGrading/';
-        newBtn.target = '_blank';
-        newBtn.rel = 'noopener'; // Security best practice for external links
+        
+        // Add click event listener to collect and pass data
+        newBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Collect data from the table
+            const students = [];
+            const rows = document.querySelectorAll('table tbody tr');
+            
+            rows.forEach(row => {
+                const nameCell = row.querySelector('td:nth-child(3)');
+                const emailCell = row.querySelector('td:nth-child(4)');
+                const statusCell = row.querySelector('td:nth-child(5)');
+                const gradeCell = row.querySelector('td:nth-child(6)');
+                
+                if (nameCell && emailCell) {
+                    const studentData = {
+                        name: nameCell.textContent?.trim() || '',
+                        email: emailCell.textContent?.trim() || '',
+                        status: statusCell?.textContent?.trim() || '',
+                        grade: gradeCell?.textContent?.trim() || ''
+                    };
+                    students.push(studentData);
+                }
+            });
+
+            // Store data in localStorage
+            localStorage.setItem('moodleStudentData', JSON.stringify(students));
+
+            // Open the webapp in a new tab
+            window.open('https://haneumc.github.io/moodleGrading/', '_blank', 'noopener');
+        });
+
         newBtn.style.cssText = `
           margin-left: 0.5rem;
           background-color: #0f6cbf;
