@@ -81,9 +81,11 @@
   }
   
   .feedback-check {
-    color: #4CAF50;
-    visibility: visible;
-    opacity: 1;
+    color: #4CAF50; /* Default green */
+  }
+  
+  .applied .feedback-check {
+    color: white; /* White when applied */
   }
   
   .check-button {
