@@ -36,12 +36,12 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Row ${index} has ${cells.length} cells`);
 
             if (cells.length > 0) {
-              // Get the full name and remove "Select" text
+              // Get the full name
               const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
               const nameText = rawNameText.replace('Select', '').trim();
               
-              // Get email from ID number column (index 2)
-              const emailText = cells[2] ? cells[2].textContent.trim() : '';
+              // Get email from Email address column (index 3)
+              const emailText = cells[3] ? cells[3].textContent.trim() : '';
               
               // Get feedback from Feedback comments column
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
