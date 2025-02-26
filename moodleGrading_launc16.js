@@ -22,40 +22,47 @@ document.addEventListener('DOMContentLoaded', function() {
             data.assignmentName = encodeURIComponent(assignmentTitle.textContent.trim());
           }
 
-          // Get student submissions from the table
-          const submissionRows = document.querySelectorAll('table.generaltable tbody tr');
-          submissionRows.forEach(row => {
-            // Get student name from the First name / Last name column (c3)
-            const nameLink = row.querySelector('td.cell.c3 a');
-            const name = nameLink ? nameLink.textContent.trim() : '';
+          // Debug: Log table presence
+          const table = document.querySelector('table.generaltable');
+          console.log('Found table:', !!table);
 
-            // Get email from Email address column
-            const emailCell = row.querySelector('td.cell.c4');
-            
-            // Get status from Status column
-            const statusCell = row.querySelector('td.cell.c5 div');
-            
-            // Get feedback from Feedback comments column
-            const feedbackCell = row.querySelector('td.cell.c12');
-            
-            // Get grade from Final grade column
-            const gradeCell = row.querySelector('td.cell.c15');
-            
-            if (name) {
-              const studentData = {
-                name: encodeURIComponent(name),
-                email: emailCell ? encodeURIComponent(emailCell.textContent.trim()) : '',
-                grade: gradeCell ? encodeURIComponent(gradeCell.textContent.trim()) : '-',
-                feedback: feedbackCell ? encodeURIComponent(feedbackCell.textContent.trim()) : '',
-                appliedIds: []
-              };
-              console.log('Processing student:', studentData); // Debug individual student data
-              data.studentData.push(studentData);
+          // Get student submissions from the table
+          const rows = document.querySelectorAll('table.generaltable > tbody > tr');
+          console.log('Found rows:', rows.length);
+
+          rows.forEach((row, index) => {
+            // Get all cells in this row
+            const cells = row.getElementsByTagName('td');
+            console.log(`Row ${index} has ${cells.length} cells`);
+
+            if (cells.length > 0) {
+              // Get the text content directly from cells
+              const nameText = cells[2] ? cells[2].textContent.replace(/\s+/g, ' ').trim() : '';
+              const emailText = cells[3] ? cells[3].textContent.trim() : '';
+              const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
+              const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
+
+              console.log('Processing row:', {
+                name: nameText,
+                email: emailText,
+                feedback: feedbackText,
+                grade: gradeText
+              });
+
+              if (nameText) {
+                const studentData = {
+                  name: encodeURIComponent(nameText),
+                  email: encodeURIComponent(emailText),
+                  grade: encodeURIComponent(gradeText),
+                  feedback: encodeURIComponent(feedbackText),
+                  appliedIds: []
+                };
+                data.studentData.push(studentData);
+              }
             }
           });
 
-          console.log('Raw table rows:', document.querySelectorAll('table.generaltable tbody tr').length);
-          console.log('Student data collected:', data.studentData.length);
+          console.log('Final data:', data);
           return data;
         }
 
@@ -80,11 +87,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // Add click event listener to collect and pass data
         newBtn.addEventListener('click', function(e) {
           e.preventDefault();
-          const gradingData = collectGradingData();
-          const dataString = JSON.stringify(gradingData);
-          const encodedData = encodeURIComponent(dataString);
-          const url = `https://haneumc.github.io/moodleGrading/?data=${encodedData}`;
-          window.open(url, '_blank');
+          try {
+            const gradingData = collectGradingData();
+            if (gradingData.studentData.length === 0) {
+              console.error('No student data collected');
+              alert('No student data found. Please check the console for details.');
+              return;
+            }
+            const dataString = JSON.stringify(gradingData);
+            const encodedData = encodeURIComponent(dataString);
+            const url = `https://haneumc.github.io/moodleGrading/?data=${encodedData}`;
+            window.open(url, '_blank');
+          } catch (error) {
+            console.error('Error collecting data:', error);
+            alert('Error collecting data. Please check the console for details.');
+          }
         });
   
         // Insert the button
