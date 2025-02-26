@@ -25,14 +25,12 @@ document.addEventListener('DOMContentLoaded', function() {
           // Get student submissions from the table
           const submissionRows = document.querySelectorAll('table.generaltable tbody tr');
           submissionRows.forEach(row => {
-            // Get student name from First name / Last name columns
-            const firstNameCell = row.querySelector('td.cell.c1');
-            const lastNameCell = row.querySelector('td.cell.c2');
-            const fullName = firstNameCell && lastNameCell ? 
-              `${firstNameCell.textContent.trim()} ${lastNameCell.textContent.trim()}` : '';
+            // Get student name from the First name / Last name column (c3)
+            const nameLink = row.querySelector('td.cell.c3 a');
+            const name = nameLink ? nameLink.textContent.trim() : '';
 
-            // Get email from ID number column
-            const emailCell = row.querySelector('td.cell.c3');
+            // Get email from Email address column
+            const emailCell = row.querySelector('td.cell.c4');
             
             // Get status from Status column
             const statusCell = row.querySelector('td.cell.c5 div');
@@ -43,12 +41,10 @@ document.addEventListener('DOMContentLoaded', function() {
             // Get grade from Final grade column
             const gradeCell = row.querySelector('td.cell.c15');
             
-            if (fullName) {
+            if (name) {
               const studentData = {
-                name: encodeURIComponent(fullName),
+                name: encodeURIComponent(name),
                 email: emailCell ? encodeURIComponent(emailCell.textContent.trim()) : '',
-                timestamp: new Date().toISOString(),
-                submission: statusCell ? encodeURIComponent(statusCell.textContent.trim()) : 'No submission',
                 grade: gradeCell ? encodeURIComponent(gradeCell.textContent.trim()) : '-',
                 feedback: feedbackCell ? encodeURIComponent(feedbackCell.textContent.trim()) : '',
                 appliedIds: []
