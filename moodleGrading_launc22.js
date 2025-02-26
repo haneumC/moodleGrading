@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
               const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
               const nameText = rawNameText.replace('Select', '').trim();
               
-              // Get email from the correct column (trying index 4 for Email address)
+              // Get email by searching for a cell containing an email address
               const emailCell = Array.from(cells).find(cell => {
                 const text = cell.textContent.trim();
                 return text.includes('@bobeldyk.us') || text.includes('@calvin.edu');
@@ -67,21 +67,28 @@ document.addEventListener('DOMContentLoaded', function() {
                 grade: gradeText
               });
 
-              if (nameText) {
+              // Only add student if we have both name and email
+              if (nameText && emailText) {
                 const studentData = {
-                  name: encodeURIComponent(nameText),
-                  email: encodeURIComponent(emailText),
-                  grade: encodeURIComponent(gradeText),
-                  feedback: encodeURIComponent(feedbackText),
+                  name: nameText,  // Don't encode yet
+                  email: emailText, // Don't encode yet
+                  grade: gradeText || '-',
+                  feedback: feedbackText || '',
                   appliedIds: []
                 };
+                
+                console.log('Adding student:', studentData); // Debug log
                 data.studentData.push(studentData);
+              } else {
+                console.log('Skipping row - missing data:', { name: nameText, email: emailText });
               }
             }
           });
 
-          console.log('Final data:', data);
-          return data;
+          // Encode the entire data object at once
+          const encodedData = encodeURIComponent(JSON.stringify(data));
+          console.log('Final encoded data:', encodedData);
+          return encodedData;
         }
 
         const newBtn = document.createElement('a');
@@ -106,15 +113,9 @@ document.addEventListener('DOMContentLoaded', function() {
         newBtn.addEventListener('click', function(e) {
           e.preventDefault();
           try {
-            const gradingData = collectGradingData();
-            if (gradingData.studentData.length === 0) {
-              console.error('No student data collected');
-              alert('No student data found. Please check the console for details.');
-              return;
-            }
-            const dataString = JSON.stringify(gradingData);
-            const encodedData = encodeURIComponent(dataString);
+            const encodedData = collectGradingData();
             const url = `https://haneumc.github.io/moodleGrading/?data=${encodedData}`;
+            console.log('Opening URL:', url);
             window.open(url, '_blank');
           } catch (error) {
             console.error('Error collecting data:', error);
