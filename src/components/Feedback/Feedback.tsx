@@ -263,7 +263,11 @@ const Feedback: React.FC<FeedbackProps> = ({ onApplyFeedback, selectedStudent, a
                             allFeedbackItems: feedbackItems
                           });
                         }}
-                        className={`w-6 h-6 ${appliedIds.includes(item.id) ? 'text-[#4CAF50]' : 'text-gray-400'}`}
+                        className={`w-6 h-6 ${
+                          selectedStudent && appliedIds.includes(item.id)
+                            ? 'bg-white text-[#4CAF50]' 
+                            : 'text-gray-400'
+                        }`}
                       >
                         ✓
                       </Button>
