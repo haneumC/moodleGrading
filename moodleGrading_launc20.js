@@ -36,8 +36,9 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Row ${index} has ${cells.length} cells`);
 
             if (cells.length > 0) {
-              // Get the full name (it's in the first column)
-              const nameText = cells[0] ? cells[0].textContent.replace(/\s+/g, ' ').trim() : '';
+              // Get the full name and remove "Select" text
+              const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
+              const nameText = rawNameText.replace('Select', '').trim();
               
               // Get email from ID number column (index 2)
               const emailText = cells[2] ? cells[2].textContent.trim() : '';
