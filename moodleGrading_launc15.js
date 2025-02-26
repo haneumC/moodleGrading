@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', function() {
       const targetElement = gradingActionLabel || chooseDropdown;
       
       if (targetElement) {
-        // Collect grading data
         function collectGradingData() {
           const data = {
             assignmentName: '',
@@ -26,31 +25,41 @@ document.addEventListener('DOMContentLoaded', function() {
           // Get student submissions from the table
           const submissionRows = document.querySelectorAll('table.generaltable tbody tr');
           submissionRows.forEach(row => {
-            // Get student name (both first and last name are in the same cell)
-            const nameCell = row.querySelector('td a[href*="user"]');
-            // Get email from the email column
-            const emailCell = row.querySelector('td.cell:nth-child(4)');
-            // Get submission status
-            const statusCell = row.querySelector('td.cell.c5');
-            // Get feedback comments
+            // Get student name from First name / Last name columns
+            const firstNameCell = row.querySelector('td.cell.c1');
+            const lastNameCell = row.querySelector('td.cell.c2');
+            const fullName = firstNameCell && lastNameCell ? 
+              `${firstNameCell.textContent.trim()} ${lastNameCell.textContent.trim()}` : '';
+
+            // Get email from ID number column
+            const emailCell = row.querySelector('td.cell.c3');
+            
+            // Get status from Status column
+            const statusCell = row.querySelector('td.cell.c5 div');
+            
+            // Get feedback from Feedback comments column
             const feedbackCell = row.querySelector('td.cell.c12');
-            // Get final grade
+            
+            // Get grade from Final grade column
             const gradeCell = row.querySelector('td.cell.c15');
             
-            if (nameCell) {
+            if (fullName) {
               const studentData = {
-                name: encodeURIComponent(nameCell.textContent.trim()),
+                name: encodeURIComponent(fullName),
                 email: emailCell ? encodeURIComponent(emailCell.textContent.trim()) : '',
                 timestamp: new Date().toISOString(),
                 submission: statusCell ? encodeURIComponent(statusCell.textContent.trim()) : 'No submission',
-                grade: gradeCell ? encodeURIComponent(gradeCell.textContent.trim()) : '',
+                grade: gradeCell ? encodeURIComponent(gradeCell.textContent.trim()) : '-',
                 feedback: feedbackCell ? encodeURIComponent(feedbackCell.textContent.trim()) : '',
                 appliedIds: []
               };
+              console.log('Processing student:', studentData); // Debug individual student data
               data.studentData.push(studentData);
             }
           });
 
+          console.log('Raw table rows:', document.querySelectorAll('table.generaltable tbody tr').length);
+          console.log('Student data collected:', data.studentData.length);
           return data;
         }
 
@@ -76,7 +85,6 @@ document.addEventListener('DOMContentLoaded', function() {
         newBtn.addEventListener('click', function(e) {
           e.preventDefault();
           const gradingData = collectGradingData();
-          console.log('Collected data:', gradingData); // For debugging
           const dataString = JSON.stringify(gradingData);
           const encodedData = encodeURIComponent(dataString);
           const url = `https://haneumc.github.io/moodleGrading/?data=${encodedData}`;
@@ -92,5 +100,6 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     } catch (error) {
       console.error('Error adding Moodle Grading button:', error);
+      console.error('Error details:', error.message);
     }
   });
