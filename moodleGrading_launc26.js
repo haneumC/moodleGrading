@@ -30,25 +30,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const cells = row.getElementsByTagName('td');
 
             if (cells.length > 0) {
-              // Get the full name
-              const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
-              const nameText = rawNameText.replace('Select', '').trim();
-              
               // Get feedback from Feedback comments column
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
               
               // Get grade from Final grade column
               const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
 
-              if (nameText) {
-                const studentData = {
-                  name: encodeURIComponent(nameText),
-                  grade: encodeURIComponent(gradeText),
-                  feedback: encodeURIComponent(feedbackText),
-                  appliedIds: []
-                };
-                data.studentData.push(studentData);
-              }
+              const studentData = {
+                grade: encodeURIComponent(gradeText),
+                feedback: encodeURIComponent(feedbackText),
+                appliedIds: []
+              };
+              data.studentData.push(studentData);
             }
           });
 
