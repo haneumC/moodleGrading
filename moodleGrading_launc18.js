@@ -38,7 +38,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cells.length > 0) {
               // Get the text content directly from cells
               const nameText = cells[2] ? cells[2].textContent.replace(/\s+/g, ' ').trim() : '';
-              const emailText = cells[3] ? cells[3].textContent.trim() : '';
+              // Get email from ID number column (index 2)
+              const emailText = cells[2] ? cells[2].textContent.trim() : '';
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
               const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
 
@@ -50,9 +51,12 @@ document.addEventListener('DOMContentLoaded', function() {
               });
 
               if (nameText) {
+                // Split the name text which contains both name and email
+                const [name, email] = nameText.split(' ');
+                
                 const studentData = {
-                  name: encodeURIComponent(nameText),
-                  email: encodeURIComponent(emailText),
+                  name: encodeURIComponent(name),
+                  email: encodeURIComponent(email || ''),
                   grade: encodeURIComponent(gradeText),
                   feedback: encodeURIComponent(feedbackText),
                   appliedIds: []
