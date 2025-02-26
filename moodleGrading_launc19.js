@@ -36,11 +36,16 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`Row ${index} has ${cells.length} cells`);
 
             if (cells.length > 0) {
-              // Get the text content directly from cells
-              const nameText = cells[2] ? cells[2].textContent.replace(/\s+/g, ' ').trim() : '';
+              // Get the full name (it's in the first column)
+              const nameText = cells[0] ? cells[0].textContent.replace(/\s+/g, ' ').trim() : '';
+              
               // Get email from ID number column (index 2)
               const emailText = cells[2] ? cells[2].textContent.trim() : '';
+              
+              // Get feedback from Feedback comments column
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
+              
+              // Get grade from Final grade column
               const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
 
               console.log('Processing row:', {
@@ -51,12 +56,9 @@ document.addEventListener('DOMContentLoaded', function() {
               });
 
               if (nameText) {
-                // Split the name text which contains both name and email
-                const [name, email] = nameText.split(' ');
-                
                 const studentData = {
-                  name: encodeURIComponent(name),
-                  email: encodeURIComponent(email || ''),
+                  name: encodeURIComponent(nameText),
+                  email: encodeURIComponent(emailText),
                   grade: encodeURIComponent(gradeText),
                   feedback: encodeURIComponent(feedbackText),
                   appliedIds: []
