@@ -4,6 +4,8 @@ interface MoodleStudent {
   name: string;
   submission: string;
   grade: string;
+  email: string;
+  feedback: string;
 }
 
 export function getImportedMoodleData(): Student[] | null {
@@ -19,10 +21,10 @@ export function getImportedMoodleData(): Student[] | null {
     // Convert Moodle data format to Student[] format
     return moodleData.studentData.map((student: MoodleStudent) => ({
       name: decodeURIComponent(student.name),
-      email: '', // Default empty email
+      email: decodeURIComponent(student.email) || '', // Add email decoding
       submission: decodeURIComponent(student.submission),
       grade: decodeURIComponent(student.grade) || '',
-      feedback: '',
+      feedback: decodeURIComponent(student.feedback) || '',
       appliedIds: [], // Empty array as default
       status: 'Not Started' as const
     }));
