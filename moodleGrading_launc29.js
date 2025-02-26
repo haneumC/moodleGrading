@@ -44,7 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
               
               // Get grade from Final grade column
-              const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
+              const gradeText = cells[14] ? cells[14].textContent.trim() : '';
 
               if (nameText) {
                 const studentData = {
