@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ColumnDef,
   SortingState,
@@ -13,6 +13,7 @@ import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
 import { useCSVHandling } from './hooks';
 import './StudentList.css';
+import { getImportedMoodleData } from '@/utils/moodleDataImport';
 
 const StudentList: React.FC<StudentListProps> = ({
   students,
@@ -23,6 +24,16 @@ const StudentList: React.FC<StudentListProps> = ({
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const { error, handleFileChange, exportForMoodle } = useCSVHandling(setStudents, assignmentName, students);
+
+  useEffect(() => {
+    // Check for Moodle data when component mounts
+    const moodleData = getImportedMoodleData();
+    if (moodleData) {
+      setStudents(moodleData);
+      // Optionally set assignment name if you have it in your state
+      // setAssignmentName(decodeURIComponent(moodleData.assignmentName));
+    }
+  }, []);
 
   const columns = useMemo<ColumnDef<Student>[]>(() => [
     { accessorKey: "name", header: "Name", cell: info => info.getValue() },

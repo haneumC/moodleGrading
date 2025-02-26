@@ -16,21 +16,33 @@ const TableBodyComponent: React.FC<TableBodyProps> = ({
 }) => {
   return (
     <>
-      <TableCaption>A list of recent student submissions.</TableCaption>
+      <TableCaption>
+        {rows.length === 0 
+          ? 'No submissions loaded. Please import data or use the Moodle Grading button.'
+          : 'A list of recent student submissions.'}
+      </TableCaption>
       <TableBody>
-        {rows.map(row => (
-          <TableRow
-            key={row.id}
-            className={selectedStudent === row.original.name ? 'selected' : ''}
-            onClick={() => onStudentSelect(row.original.name)}
-          >
-            {row.getVisibleCells().map(cell => (
-              <TableCell key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </TableCell>
-            ))}
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={4} className="text-center">
+              No data available
+            </TableCell>
           </TableRow>
-        ))}
+        ) : (
+          rows.map(row => (
+            <TableRow
+              key={row.id}
+              className={selectedStudent === row.original.name ? 'selected' : ''}
+              onClick={() => onStudentSelect(row.original.name)}
+            >
+              {row.getVisibleCells().map(cell => (
+                <TableCell key={cell.id}>
+                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))
+        )}
       </TableBody>
     </>
   );

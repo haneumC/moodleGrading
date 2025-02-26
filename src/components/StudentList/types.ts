@@ -5,6 +5,8 @@ export interface Student {
   grade: string;
   feedback: string;
   appliedIds: number[];
+  submission?: string;
+  status?: 'Not Started' | 'In Progress' | 'Completed';
 }
 
 export interface StudentListProps {
@@ -13,4 +15,4 @@ export interface StudentListProps {
   selectedStudent: string | null;
   onStudentSelect: (studentName: string) => void;
   assignmentName: string;
-} 
+}
