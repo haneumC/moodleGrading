@@ -20,7 +20,6 @@ export function getImportedMoodleData(): Student[] | null {
     return moodleData.studentData.map((student: MoodleStudent) => ({
       name: decodeURIComponent(student.name),
       email: '', // Default empty email
-      timestamp: new Date().toISOString(), // Current timestamp as default
       submission: decodeURIComponent(student.submission),
       grade: decodeURIComponent(student.grade) || '',
       feedback: '',
