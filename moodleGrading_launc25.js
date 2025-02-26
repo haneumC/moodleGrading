@@ -52,6 +52,8 @@ document.addEventListener('DOMContentLoaded', function() {
             }
           });
 
+          // Debug log to see exact data structure
+          console.log('Data being sent:', JSON.parse(JSON.stringify(data)));
           return data;
         }
 
@@ -84,6 +86,8 @@ document.addEventListener('DOMContentLoaded', function() {
               return;
             }
             const dataString = JSON.stringify(gradingData);
+            // Debug log to see final encoded data
+            console.log('Final data string:', dataString);
             const encodedData = encodeURIComponent(dataString);
             const url = `https://haneumc.github.io/moodleGrading/?data=${encodedData}`;
             window.open(url, '_blank');
