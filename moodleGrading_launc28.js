@@ -25,40 +25,40 @@ document.addEventListener('DOMContentLoaded', function() {
           // Get student submissions from the table
           const rows = document.querySelectorAll('table.generaltable > tbody > tr');
 
-          // Add debug logging for data structure
-          console.log('Initial data structure:', {
-            assignmentName: data.assignmentName,
-            studentData: []
-          });
-
           rows.forEach((row, index) => {
             const cells = row.getElementsByTagName('td');
 
             if (cells.length > 0) {
+              // Get the full name
+              const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
+              const nameText = rawNameText.replace('Select', '').trim();
+              
+              // Get email by searching for a cell containing an email address
+              const emailCell = Array.from(cells).find(cell => {
+                const text = cell.textContent.trim();
+                return text.includes('@bobeldyk.us') || text.includes('@calvin.edu');
+              });
+              const emailText = emailCell ? emailCell.textContent.trim() : '';
+              
               // Get feedback from Feedback comments column
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
               
               // Get grade from Final grade column
               const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
 
-              const studentData = {
-                grade: encodeURIComponent(gradeText),
-                feedback: encodeURIComponent(feedbackText),
-                appliedIds: []
-              };
-
-              // Debug log each student data before pushing
-              console.log(`Student ${index} data:`, JSON.stringify(studentData));
-              
-              data.studentData.push(studentData);
+              if (nameText) {
+                const studentData = {
+                  name: encodeURIComponent(nameText),
+                  email: encodeURIComponent(emailText),
+                  grade: encodeURIComponent(gradeText),
+                  feedback: encodeURIComponent(feedbackText),
+                  appliedIds: []
+                };
+                data.studentData.push(studentData);
+              }
             }
           });
 
-          // Debug log final data before returning
-          console.log('Final data before return:', JSON.stringify(data));
-          console.log('Data structure keys:', Object.keys(data));
-          console.log('Student data keys:', data.studentData.length > 0 ? Object.keys(data.studentData[0]) : []);
-          
           return data;
         }
 
