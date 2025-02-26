@@ -40,11 +40,13 @@ document.addEventListener('DOMContentLoaded', function() {
               });
               const emailText = emailCell ? emailCell.textContent.trim() : '';
               
-              // Get feedback from Feedback comments column
-              const feedbackText = cells[11] ? cells[11].textContent.replace(/\s+/g, ' ').trim() : '';
+              // Get feedback from Feedback comments column and clean it
+              const rawFeedback = cells[11] ? cells[11].textContent.replace(/\s+/g, ' ').trim() : '';
+              const feedbackText = rawFeedback === '-' ? '' : rawFeedback;
               
-              // Get grade from Final grade column
-              const gradeText = cells[14] ? cells[14].textContent.replace(/\s+/g, ' ').trim() : '';
+              // Get grade from Final grade column and clean it
+              const rawGrade = cells[14] ? cells[14].textContent.replace(/\s+/g, ' ').trim() : '';
+              const gradeText = rawGrade === '-' ? '' : rawGrade;
 
               if (nameText) {
                 const studentData = {
