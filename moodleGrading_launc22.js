@@ -33,15 +33,26 @@ document.addEventListener('DOMContentLoaded', function() {
           rows.forEach((row, index) => {
             // Get all cells in this row
             const cells = row.getElementsByTagName('td');
-            console.log(`Row ${index} has ${cells.length} cells`);
+            
+            // Debug: Log all cell contents for the first row
+            if (index === 0) {
+              console.log('All cells in first row:');
+              cells.forEach((cell, i) => {
+                console.log(`Cell ${i}:`, cell.textContent.trim());
+              });
+            }
 
             if (cells.length > 0) {
               // Get the full name
               const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
               const nameText = rawNameText.replace('Select', '').trim();
               
-              // Get email from Email address column (index 3)
-              const emailText = cells[3] ? cells[3].textContent.trim() : '';
+              // Get email from the correct column (trying index 4 for Email address)
+              const emailCell = Array.from(cells).find(cell => {
+                const text = cell.textContent.trim();
+                return text.includes('@bobeldyk.us') || text.includes('@calvin.edu');
+              });
+              const emailText = emailCell ? emailCell.textContent.trim() : '';
               
               // Get feedback from Feedback comments column
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
