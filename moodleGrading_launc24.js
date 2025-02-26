@@ -22,37 +22,17 @@ document.addEventListener('DOMContentLoaded', function() {
             data.assignmentName = encodeURIComponent(assignmentTitle.textContent.trim());
           }
 
-          // Debug: Log table presence
-          const table = document.querySelector('table.generaltable');
-          console.log('Found table:', !!table);
-
           // Get student submissions from the table
           const rows = document.querySelectorAll('table.generaltable > tbody > tr');
           console.log('Found rows:', rows.length);
 
           rows.forEach((row, index) => {
-            // Get all cells in this row
             const cells = row.getElementsByTagName('td');
-            
-            // Debug: Log all cell contents for the first row
-            if (index === 0) {
-              console.log('All cells in first row:');
-              cells.forEach((cell, i) => {
-                console.log(`Cell ${i}:`, cell.textContent.trim());
-              });
-            }
 
             if (cells.length > 0) {
               // Get the full name
               const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
               const nameText = rawNameText.replace('Select', '').trim();
-              
-              // Get email by searching for a cell containing an email address
-              const emailCell = Array.from(cells).find(cell => {
-                const text = cell.textContent.trim();
-                return text.includes('@bobeldyk.us') || text.includes('@calvin.edu');
-              });
-              const emailText = emailCell ? emailCell.textContent.trim() : '';
               
               // Get feedback from Feedback comments column
               const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
@@ -60,35 +40,19 @@ document.addEventListener('DOMContentLoaded', function() {
               // Get grade from Final grade column
               const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
 
-              console.log('Processing row:', {
-                name: nameText,
-                email: emailText,
-                feedback: feedbackText,
-                grade: gradeText
-              });
-
-              // Only add student if we have both name and email
-              if (nameText && emailText) {
+              if (nameText) {
                 const studentData = {
-                  name: nameText,  // Don't encode yet
-                  email: emailText, // Don't encode yet
-                  grade: gradeText || '-',
-                  feedback: feedbackText || '',
+                  name: encodeURIComponent(nameText),
+                  grade: encodeURIComponent(gradeText),
+                  feedback: encodeURIComponent(feedbackText),
                   appliedIds: []
                 };
-                
-                console.log('Adding student:', studentData); // Debug log
                 data.studentData.push(studentData);
-              } else {
-                console.log('Skipping row - missing data:', { name: nameText, email: emailText });
               }
             }
           });
 
-          // Encode the entire data object at once
-          const encodedData = encodeURIComponent(JSON.stringify(data));
-          console.log('Final encoded data:', encodedData);
-          return encodedData;
+          return data;
         }
 
         const newBtn = document.createElement('a');
@@ -113,9 +77,15 @@ document.addEventListener('DOMContentLoaded', function() {
         newBtn.addEventListener('click', function(e) {
           e.preventDefault();
           try {
-            const encodedData = collectGradingData();
+            const gradingData = collectGradingData();
+            if (gradingData.studentData.length === 0) {
+              console.error('No student data collected');
+              alert('No student data found. Please check the console for details.');
+              return;
+            }
+            const dataString = JSON.stringify(gradingData);
+            const encodedData = encodeURIComponent(dataString);
             const url = `https://haneumc.github.io/moodleGrading/?data=${encodedData}`;
-            console.log('Opening URL:', url);
             window.open(url, '_blank');
           } catch (error) {
             console.error('Error collecting data:', error);
