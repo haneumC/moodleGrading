@@ -24,7 +24,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
           // Get student submissions from the table
           const rows = document.querySelectorAll('table.generaltable > tbody > tr');
-          console.log('Found rows:', rows.length);
+
+          // Add debug logging for data structure
+          console.log('Initial data structure:', {
+            assignmentName: data.assignmentName,
+            studentData: []
+          });
 
           rows.forEach((row, index) => {
             const cells = row.getElementsByTagName('td');
@@ -41,12 +46,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 feedback: encodeURIComponent(feedbackText),
                 appliedIds: []
               };
+
+              // Debug log each student data before pushing
+              console.log(`Student ${index} data:`, JSON.stringify(studentData));
+              
               data.studentData.push(studentData);
             }
           });
 
-          // Debug log to see exact data structure
-          console.log('Data being sent:', JSON.parse(JSON.stringify(data)));
+          // Debug log final data before returning
+          console.log('Final data before return:', JSON.stringify(data));
+          console.log('Data structure keys:', Object.keys(data));
+          console.log('Student data keys:', data.studentData.length > 0 ? Object.keys(data.studentData[0]) : []);
+          
           return data;
         }
 
