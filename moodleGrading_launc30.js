@@ -41,19 +41,26 @@ document.addEventListener('DOMContentLoaded', function() {
               const emailText = emailCell ? emailCell.textContent.trim() : '';
               
               // Get feedback from Feedback comments column
-              const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
+              const feedbackText = cells[11] ? cells[11].textContent.replace(/\s+/g, ' ').trim() : '';
               
               // Get grade from Final grade column
-              const gradeText = cells[14] ? cells[14].textContent.trim() : '';
+              const gradeText = cells[14] ? cells[14].textContent.replace(/\s+/g, ' ').trim() : '';
 
               if (nameText) {
                 const studentData = {
                   name: encodeURIComponent(nameText),
                   email: encodeURIComponent(emailText),
-                  grade: encodeURIComponent(gradeText),
-                  feedback: encodeURIComponent(feedbackText),
+                  grade: encodeURIComponent(gradeText || ''),
+                  feedback: encodeURIComponent(feedbackText || ''),
                   appliedIds: []
                 };
+                // Debug log to verify data
+                console.log('Student data before push:', {
+                  name: nameText,
+                  email: emailText,
+                  grade: gradeText || '',
+                  feedback: feedbackText || ''
+                });
                 data.studentData.push(studentData);
               }
             }

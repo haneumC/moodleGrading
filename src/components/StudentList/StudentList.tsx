@@ -48,16 +48,16 @@ const StudentList: React.FC<StudentListProps> = ({
     {
       accessorKey: "grade",
       header: "Grade",
-      cell: info => info.getValue(),
+      cell: info => info.getValue() || '',
       sortingFn: (rowA, rowB) =>
-        parseInt(rowA.original.grade) - parseInt(rowB.original.grade),
+        parseInt(rowA.original.grade || '0') - parseInt(rowB.original.grade || '0'),
     },
     { 
       accessorKey: "feedback", 
       header: "Feedback", 
       cell: info => (
         <div style={{ whiteSpace: 'pre-line' }}>
-          {info.getValue() as string}
+          {(info.getValue() as string) || ''}
         </div>
       )
     },
