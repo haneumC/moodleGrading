@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Table } from "@/components/ui/table";
-import { Student, StudentListProps } from './types';
+import { Student, StudentListProps, FeedbackItem, ChangeRecord } from './types';
 import TableHeaderComponent from './components/TableHeader';
 import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
@@ -195,6 +195,17 @@ const StudentList: React.FC<StudentListProps> = ({
     } finally {
       e.target.value = '';
     }
+  };
+
+  const handleFeedbackEdit = (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => {
+    setStudents(prevStudents =>
+      prevStudents.map(student => {
+        if (student.appliedIds.includes(oldFeedback.id)) {
+          // ... rest of the function ...
+        }
+        return student;
+      })
+    );
   };
 
   return (

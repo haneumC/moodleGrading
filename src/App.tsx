@@ -56,16 +56,17 @@ const MainApp = () => {
   }, []);
 
   const handleChangeTracked = (change: ChangeRecord) => {
+    // Only track grade and feedback changes, ignore auto-saves
+    if (change.type !== 'grade' && change.type !== 'feedback') return;
+
     setChangeHistory(prev => {
-      let message;
+      let message = '';
       if (change.type === 'grade') {
         message = `${change.studentName}: ${change.oldValue} → ${change.newValue} points`;
       } else if (change.type === 'feedback') {
         const oldValue = change.oldValue as { grade: string; feedback: string; appliedIds: number[] };
         const newValue = change.newValue as { grade: string; feedback: string; appliedIds: number[] };
-        message = `${change.studentName}: ${oldValue.grade} → ${newValue.grade} points`;
-      } else {
-        message = `Auto-saved at ${new Date().toLocaleTimeString()}`;
+        message = `${change.studentName}: ${oldValue.grade || '0'} → ${newValue.grade} points`;
       }
 
       const newChange = {
@@ -74,6 +75,7 @@ const MainApp = () => {
         timestamp: new Date().toISOString()
       };
 
+      // Prevent duplicate entries within 1 second
       if (prev.length > 0) {
         const lastChange = prev[0];
         if (
@@ -84,6 +86,7 @@ const MainApp = () => {
           return prev;
         }
       }
+
       return [newChange, ...prev.slice(0, MAX_CHANGES - 1)];
     });
   };
@@ -91,6 +94,7 @@ const MainApp = () => {
   const handleRevertChange = (change: ChangeRecord) => {
     if (!change.studentName) return;
 
+    // Revert the student's state
     setStudents(prevStudents =>
       prevStudents.map(student => {
         if (student.name === change.studentName) {
@@ -110,13 +114,13 @@ const MainApp = () => {
       })
     );
 
-    const changeIndex = changeHistory.findIndex(c => 
-      c.timestamp === change.timestamp && 
-      c.studentName === change.studentName
+    // Only remove the specific change from history
+    setChangeHistory(prev => 
+      prev.filter(c => 
+        !(c.timestamp === change.timestamp && 
+          c.studentName === change.studentName)
+      )
     );
-    if (changeIndex !== -1) {
-      setChangeHistory(prev => prev.slice(changeIndex + 1));
-    }
   };
 
   const handleFeedbackEdit = (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => {
@@ -202,6 +206,7 @@ const MainApp = () => {
             setFeedbackItems={setFeedbackItems}
             students={students}
             onStudentsUpdate={setStudents}
+            onChangeTracked={handleChangeTracked}
           />
         </div>
         <div className="right">
@@ -214,9 +219,7 @@ const MainApp = () => {
             setAssignmentName={setAssignmentName}
             feedbackItems={feedbackItems}
             setFeedbackItems={setFeedbackItems}
-            changeHistory={changeHistory}
             onChangeTracked={handleChangeTracked}
-            onRevertChange={handleRevertChange}
           />
         </div>
       </main>

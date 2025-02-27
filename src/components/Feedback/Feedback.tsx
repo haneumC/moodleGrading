@@ -11,27 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { Student } from '@/components/StudentList/types';
+import { Student, FeedbackItem, ChangeRecord } from '@/components/StudentList/types';
+import { FeedbackProps } from './types';
 
-interface FeedbackItem {
-  id: number;
-  comment: string;
-  grade: number;
-  applied?: boolean;
-}
-
+// Add these type definitions at the top of the file
 type SortField = 'text' | 'deduction' | 'applied';
 type SortDirection = 'asc' | 'desc';
-
-interface FeedbackProps {
-  selectedStudent: string | null;
-  appliedIds: number[];
-  onFeedbackEdit: (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => void;
-  feedbackItems: FeedbackItem[];
-  setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
-  students: Student[];
-  onStudentsUpdate: (students: Student[]) => void;
-}
 
 interface ApplyFeedbackParams {
   feedbackItem: FeedbackItem;
@@ -45,7 +30,8 @@ const Feedback: React.FC<FeedbackProps> = ({
   feedbackItems,
   setFeedbackItems,
   students,
-  onStudentsUpdate
+  onStudentsUpdate,
+  onChangeTracked
 }) => {
   const [isAddingFeedback, setIsAddingFeedback] = useState(false);
   const [newFeedback, setNewFeedback] = useState<Omit<FeedbackItem, 'id' | 'applied'>>({ 
@@ -60,53 +46,71 @@ const Feedback: React.FC<FeedbackProps> = ({
   const [reusableIds, setReusableIds] = useState<number[]>([]);
   const [nextId, setNextId] = useState<number>(5);
 
-  const handleApplyFeedback = ({ feedbackItem, allFeedbackItems }: ApplyFeedbackParams) => {
+  const handleApplyFeedback = (feedbackItem: FeedbackItem) => {
     if (!selectedStudent) return;
 
-    const updatedStudents = students.map(student => {
-      if (student.name === selectedStudent) {
-        if (student.appliedIds.includes(feedbackItem.id)) {
-          const feedbackLines = student.feedback
-            .split('\n')
-            .filter((line: string) => line.trim() !== feedbackItem.comment.trim())
-            .filter((line: string) => line.trim() !== '')
-            .join('\n\n');
+    onStudentsUpdate(prevStudents =>
+      prevStudents.map(student => {
+        if (student.name === selectedStudent) {
+          const oldState = { ...student };
+          
+          if (student.appliedIds.includes(feedbackItem.id)) {
+            // Remove the feedback
+            const feedbackLines = student.feedback
+              .split('\n')
+              .filter(line => line.trim() !== feedbackItem.comment.trim())
+              .filter(line => line.trim() !== '')
+              .join('\n\n');
 
-          const remainingIds = student.appliedIds.filter((id: number) => id !== feedbackItem.id);
-          const totalDeduction = allFeedbackItems
-            .filter((item: FeedbackItem) => remainingIds.includes(item.id))
-            .reduce((sum: number, item: FeedbackItem) => sum + item.grade, 0);
-          const newGrade = Math.max(0, 20 - totalDeduction).toString();
+            // Calculate new grade
+            const remainingIds = student.appliedIds.filter(id => id !== feedbackItem.id);
+            const newState = {
+              ...student,
+              grade: remainingIds.length === 0 ? "" : (20 - feedbackItem.grade).toString(),
+              feedback: feedbackLines || "",
+              appliedIds: remainingIds,
+            };
 
-          return {
-            ...student,
-            grade: newGrade,
-            feedback: feedbackLines || "",
-            appliedIds: remainingIds,
-          };
-        } else {
-          const newFeedback = student.feedback
-            ? `${student.feedback}\n\n${feedbackItem.comment}`
-            : feedbackItem.comment;
+            // Track the change
+            onChangeTracked({
+              type: 'feedback',
+              studentName: student.name,
+              oldValue: oldState,
+              newValue: newState,
+              timestamp: new Date().toISOString()
+            });
 
-          const newAppliedIds = [...student.appliedIds, feedbackItem.id];
-          const totalDeduction = allFeedbackItems
-            .filter(item => newAppliedIds.includes(item.id))
-            .reduce((sum, item) => sum + item.grade, 0);
-          const newGrade = Math.max(0, 20 - totalDeduction).toString();
+            return newState;
+          } else {
+            // Apply the feedback
+            const newAppliedIds = [...student.appliedIds, feedbackItem.id];
+            const newGrade = (20 - feedbackItem.grade).toString();
+            const newFeedback = student.feedback
+              ? `${student.feedback.trim()}\n\n${feedbackItem.comment.trim()}`
+              : feedbackItem.comment.trim();
 
-          return {
-            ...student,
-            grade: newGrade,
-            feedback: newFeedback,
-            appliedIds: newAppliedIds,
-          };
+            const newState = {
+              ...student,
+              grade: newGrade,
+              feedback: newFeedback,
+              appliedIds: newAppliedIds,
+            };
+
+            // Track the change
+            onChangeTracked({
+              type: 'feedback',
+              studentName: student.name,
+              oldValue: oldState,
+              newValue: newState,
+              timestamp: new Date().toISOString()
+            });
+
+            return newState;
+          }
         }
-      }
-      return student;
-    });
-
-    onStudentsUpdate(updatedStudents);
+        return student;
+      })
+    );
   };
 
   const handleAddFeedback = () => {
@@ -315,10 +319,7 @@ const Feedback: React.FC<FeedbackProps> = ({
                         variant="ghost"
                         size="icon"
                         disabled={!selectedStudent}
-                        onClick={() => handleApplyFeedback({
-                          feedbackItem: item,
-                          allFeedbackItems: feedbackItems
-                        })}
+                        onClick={() => handleApplyFeedback(item)}
                         className={`w-6 h-6 ${
                           selectedStudent && appliedIds.includes(item.id)
                             ? 'bg-white text-[#4CAF50]' 
