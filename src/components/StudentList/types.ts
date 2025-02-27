@@ -1,10 +1,17 @@
 export interface Student {
   name: string;
   email: string;
-  lastModifiedSubmission: string;
   grade: string;
   feedback: string;
   appliedIds: number[];
+  identifier?: string;
+  idNumber?: string;
+  status?: string;
+  maxGrade?: string;
+  gradeCanBeChanged?: string;
+  lastModifiedSubmission?: string;
+  onlineText?: string;
+  lastModifiedGrade?: string;
 }
 
 export interface FeedbackItem {
@@ -15,23 +22,23 @@ export interface FeedbackItem {
 }
 
 export interface ChangeRecord {
-  type: string;
+  type: 'grade' | 'feedback' | 'import' | 'auto-save';
   studentName: string;
-  oldValue: any;
-  newValue: any;
+  oldValue: string | { grade: string; feedback: string; appliedIds: number[] };
+  newValue: string | { grade: string; feedback: string; appliedIds: number[] };
   timestamp: string;
   message?: string;
 }
 
 export interface StudentListProps {
   students: Student[];
-  setStudents: (students: Student[]) => void;
+  setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   selectedStudent: string | null;
   onStudentSelect: (student: string | null) => void;
   assignmentName: string;
   setAssignmentName: (name: string) => void;
   feedbackItems: FeedbackItem[];
-  setFeedbackItems: (items: FeedbackItem[]) => void;
+  setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
   onChangeTracked: (change: ChangeRecord) => void;
 }
 

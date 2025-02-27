@@ -47,66 +47,47 @@ export const useCSVHandling = (
     }
   };
 
-  const processCSVData = (csvString: string) => {
-    const result = Papa.parse(csvString, {
-      header: false,
-      skipEmptyLines: true
-    });
+  const processCSVData = (csvData: string[][]): Student[] => {
+    const headerRow = csvData[0];
     
-    const output = result.data as string[][];
-    const headerRow: string[] = output[0];
-    
-    const parsedStudents = output.slice(1).map((row: string[]) => {
-      const student: Record<string, string> = {};
-      headerRow.forEach((header: string, index: number) => {
-        student[header] = row[index] || "";
+    return csvData.slice(1).map(row => {
+      const student: Student = {
+        name: '',
+        email: '',
+        grade: '',
+        feedback: '',
+        appliedIds: [],
+      };
+
+      headerRow.forEach((header, index) => {
+        const value = row[index] || '';
+        switch(header) {
+          case 'Full name': student.name = value; break;
+          case 'Email address': student.email = value; break;
+          case 'Grade': student.grade = value; break;
+          case 'Feedback comments': student.feedback = value; break;
+          // Add other fields as needed
+        }
       });
+
       return student;
-    });
-
-    setStudents(
-      parsedStudents.map((student) => ({
-        identifier: student["Identifier"] || "",
-        name: student["Full name"] || "",
-        idNumber: student["ID number"] || "",
-        email: student["Email address"] || "",
-        status: student["Status"] || "",
-        grade: student["Grade"] || "",
-        maxGrade: student["Maximum Grade"] || "",
-        gradeCanBeChanged: student["Grade can be changed"] || "",
-        lastModifiedSubmission: student["Last modified (submission)"] || "",
-        onlineText: student["Online text"] || "",
-        lastModifiedGrade: student["Last modified (grade)"] || "",
-        feedback: student["Feedback comments"] || "",
-        appliedIds: []
-      }))
-    );
-
-    // Track the change
-    onChangeTracked?.({
-      type: 'auto-save',
-      timestamp: new Date().toISOString(),
-      message: 'CSV data imported',
-      oldValue: '',
-      newValue: ''
     });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setStudents([]);
-      setError("");
-      
-      const fileReader = new FileReader();
-      fileReader.onload = (event) => {
-        const text = event.target?.result as string;
-        if (validateCSV(text)) {
-          processCSVData(text);
-          setError("");
-        }
-      };
-      fileReader.readAsText(file);
+    if (!file) return;
+
+    try {
+      const content = await file.text();
+      if (validateCSV(content)) {
+        const rows = content.split('\n').map(row => row.split(','));
+        const students = processCSVData(rows);
+        setStudents(students);
+        trackImport();
+      }
+    } catch (error) {
+      console.error('Error reading CSV:', error);
     }
   };
 
@@ -157,6 +138,17 @@ export const useCSVHandling = (
       console.error('CSV parsing error:', err);
       setError("Error exporting the CSV file.");
     }
+  };
+
+  const trackImport = () => {
+    onChangeTracked?.({
+      type: 'import',
+      studentName: 'System',
+      timestamp: new Date().toISOString(),
+      message: 'CSV data imported',
+      oldValue: '',
+      newValue: ''
+    });
   };
 
   return {

@@ -11,17 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { Student, FeedbackItem, ChangeRecord } from '@/components/StudentList/types';
+import { FeedbackItem } from '@/components/StudentList/types';
 import { FeedbackProps } from './types';
 
-// Add these type definitions at the top of the file
+// Only keep the types we're using
 type SortField = 'text' | 'deduction' | 'applied';
 type SortDirection = 'asc' | 'desc';
-
-interface ApplyFeedbackParams {
-  feedbackItem: FeedbackItem;
-  allFeedbackItems: FeedbackItem[];
-}
 
 const Feedback: React.FC<FeedbackProps> = ({ 
   selectedStudent, 
@@ -29,7 +24,6 @@ const Feedback: React.FC<FeedbackProps> = ({
   onFeedbackEdit,
   feedbackItems,
   setFeedbackItems,
-  students,
   onStudentsUpdate,
   onChangeTracked
 }) => {

@@ -12,17 +12,16 @@ const ChangeHistoryPanel: React.FC<ChangeHistoryPanelProps> = ({
   onClose,
   onRevert
 }) => {
-  const formatMessage = (message: string) => {
-    // Extract student name and points from message
+  const formatMessage = (message: string | undefined): React.ReactNode => {
+    if (!message) return null;
+    
     const match = message.match(/^(.*?): (\d+) → (\d+) points$/);
     if (match) {
-      const [_, studentName, oldPoints, newPoints] = match;
+      const [, studentName, oldPoints, newPoints] = match;
       return (
         <div className="flex items-center gap-2">
           <span className="text-gray-200">{studentName}:</span>
-          <span className="text-gray-400">{oldPoints}</span>
-          <span className="text-gray-400">→</span>
-          <span className="text-gray-200">{newPoints} points</span>
+          <span className="text-gray-400">{oldPoints} → {newPoints} points</span>
         </div>
       );
     }

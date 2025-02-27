@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ColumnDef,
   SortingState,
@@ -7,7 +7,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Table } from "@/components/ui/table";
-import { Student, StudentListProps, FeedbackItem, ChangeRecord } from './types';
+import { Student } from './types';  // Only import what we need
+import type { StudentListProps } from './types';  // Import type separately
 import TableHeaderComponent from './components/TableHeader';
 import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
@@ -62,15 +63,19 @@ const StudentList: React.FC<StudentListProps> = ({
     }
   }, []);
 
-  const columns = useMemo<ColumnDef<Student>[]>(() => [
+  // Fix the date comparison
+  const columns: ColumnDef<Student>[] = [
     { accessorKey: "name", header: "Name", cell: info => info.getValue() },
     { accessorKey: "email", header: "Email", cell: info => info.getValue() },
     {
       accessorKey: "lastModifiedSubmission",
-      header: "Timestamp",
+      header: "Last Modified",
       cell: info => info.getValue(),
-      sortingFn: (rowA, rowB) =>
-        new Date(rowA.original.lastModifiedSubmission) > new Date(rowB.original.lastModifiedSubmission) ? 1 : -1,
+      sortingFn: (rowA, rowB) => {
+        const dateA = rowA.original.lastModifiedSubmission || '';
+        const dateB = rowB.original.lastModifiedSubmission || '';
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+      },
     },
     {
       accessorKey: "grade",
@@ -88,7 +93,7 @@ const StudentList: React.FC<StudentListProps> = ({
         </div>
       )
     },
-  ], []);
+  ];
 
   const table = useReactTable({
     data: students,
@@ -195,17 +200,6 @@ const StudentList: React.FC<StudentListProps> = ({
     } finally {
       e.target.value = '';
     }
-  };
-
-  const handleFeedbackEdit = (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => {
-    setStudents(prevStudents =>
-      prevStudents.map(student => {
-        if (student.appliedIds.includes(oldFeedback.id)) {
-          // ... rest of the function ...
-        }
-        return student;
-      })
-    );
   };
 
   return (

@@ -6,9 +6,12 @@ import { HashRouter as Router, Route, Routes, useNavigate } from 'react-router-d
 import AboutPage from './components/About/About';
 import { Student, ChangeRecord, FeedbackItem } from '@/components/StudentList/types';
 import ChangeHistoryPanel from './components/StudentList/components/ChangeHistoryPanel';
+import { saveAs } from 'file-saver';
 
 const AUTO_SAVE_KEY = 'grading_autosave';
 const MAX_CHANGES = 50;
+const AUTO_SAVE_INTERVAL = 3 * 60 * 1000; // 3 minutes in milliseconds
+const SAVE_HANDLE_KEY = 'save_handle_id';
 
 const defaultFeedback: FeedbackItem[] = [
   { id: 1, comment: "Add more comments", grade: 3 },
@@ -27,6 +30,8 @@ const MainApp = () => {
   const [changeHistory, setChangeHistory] = useState<ChangeRecord[]>([]);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
+  const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
+  const [initialSaveComplete, setInitialSaveComplete] = useState(false);
 
   useEffect(() => {
     const savedData = localStorage.getItem(AUTO_SAVE_KEY);
@@ -52,6 +57,35 @@ const MainApp = () => {
       } catch (error) {
         console.error('Error loading auto-saved data:', error);
       }
+    }
+  }, []);
+
+  // Try to restore saved file handle on mount
+  useEffect(() => {
+    const handleId = localStorage.getItem(SAVE_HANDLE_KEY);
+    if (handleId) {
+      // Request permission to use the file handle
+      navigator.storage?.getDirectory?.()?.then(async (root) => {
+        try {
+          const handle = await root.getFileHandle(handleId);
+          if (handle) {
+            setSavedFileHandle(handle);
+          }
+        } catch (err) {
+          console.error('Could not restore file handle:', err);
+          localStorage.removeItem(SAVE_HANDLE_KEY);
+        }
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load data from extension storage
+    const moodleData = localStorage.getItem('moodleGradingData');
+    if (moodleData) {
+      const { assignmentName, students } = JSON.parse(moodleData);
+      setAssignmentName(assignmentName);
+      setStudents(students);
     }
   }, []);
 
@@ -155,6 +189,91 @@ const MainApp = () => {
     );
   };
 
+  const saveData = async (showStatus: boolean = false) => {
+    try {
+      const saveData = {
+        students,
+        assignmentName,
+        timestamp: new Date().toISOString(),
+        feedbackItems
+      };
+      const jsonString = JSON.stringify(saveData, null, 2);
+
+      // Only prompt for save location on first save
+      if (!initialSaveComplete) {
+        if ('showSaveFilePicker' in window) {
+          try {
+            const options = {
+              suggestedName: `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`,
+              types: [{
+                description: 'JSON Files',
+                accept: { 'application/json': ['.json'] },
+              }],
+            };
+
+            const handle = await window.showSaveFilePicker(options);
+            setSavedFileHandle(handle);
+            localStorage.setItem(SAVE_HANDLE_KEY, handle.name);
+            setInitialSaveComplete(true);
+
+            const writable = await handle.createWritable();
+            await writable.write(jsonString);
+            await writable.close();
+          } catch (err) {
+            console.error('Save error:', err);
+            return; // Don't proceed if user cancels initial save
+          }
+        } else {
+          // Fallback for browsers without File System API
+          const blob = new Blob([jsonString], { type: 'application/json' });
+          saveAs(blob, `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`);
+          setInitialSaveComplete(true);
+        }
+      } else if (savedFileHandle) {
+        // Use existing file handle for subsequent saves
+        const writable = await savedFileHandle.createWritable();
+        await writable.write(jsonString);
+        await writable.close();
+      }
+
+      if (showStatus) {
+        setLastSaved(new Date());
+      }
+    } catch (err) {
+      console.error('Save error:', err);
+    }
+  };
+
+  // Modify the auto-save effect to only run after initial save
+  useEffect(() => {
+    if (!initialSaveComplete) return;
+
+    const autoSave = async () => {
+      if (students.length > 0) {
+        await saveData(false);
+      }
+    };
+    
+    const timeoutId = setTimeout(autoSave, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [students, feedbackItems, assignmentName, initialSaveComplete]);
+
+  // Add a manual save button
+  const handleSaveProgress = async () => {
+    await saveData(true);
+  };
+
+  // Add periodic auto-save with status
+  useEffect(() => {
+    if (!initialSaveComplete) return;
+
+    const intervalId = setInterval(() => {
+      saveData(true);
+    }, AUTO_SAVE_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [initialSaveComplete]);
+
   return (
     <div className="grading-assistant relative">
       <button 
@@ -224,11 +343,20 @@ const MainApp = () => {
         </div>
       </main>
       
-      {lastSaved && (
-        <div className="fixed bottom-4 right-4 text-sm text-gray-500">
-          Last saved: {lastSaved.toLocaleTimeString()}
-        </div>
-      )}
+      <div className="flex gap-2">
+        <button
+          onClick={handleSaveProgress}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          disabled={!students.length}
+        >
+          Save Progress
+        </button>
+        {lastSaved && (
+          <div className="fixed bottom-4 right-4 text-sm text-gray-500">
+            Last saved: {lastSaved.toLocaleTimeString()}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
