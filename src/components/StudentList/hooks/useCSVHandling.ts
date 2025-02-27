@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
-import { Student } from '../types';
+import { Student, ChangeRecord } from '../types';
 
 export const useCSVHandling = (
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>,
   assignmentName: string,
-  students: Student[]
+  students: Student[],
+  onChangeTracked?: (change: ChangeRecord) => void
 ) => {
   const [error, setError] = useState<string>("");
 
@@ -39,7 +40,8 @@ export const useCSVHandling = (
       }
 
       return true;
-    } catch (_) {
+    } catch (err: unknown) {
+      console.error('CSV parsing error:', err);
       setError("Error parsing the CSV file.");
       return false;
     }
@@ -64,14 +66,30 @@ export const useCSVHandling = (
 
     setStudents(
       parsedStudents.map((student) => ({
+        identifier: student["Identifier"] || "",
         name: student["Full name"] || "",
+        idNumber: student["ID number"] || "",
         email: student["Email address"] || "",
-        timestamp: student["Last modified (submission)"] || "",
+        status: student["Status"] || "",
         grade: student["Grade"] || "",
+        maxGrade: student["Maximum Grade"] || "",
+        gradeCanBeChanged: student["Grade can be changed"] || "",
+        lastModifiedSubmission: student["Last modified (submission)"] || "",
+        onlineText: student["Online text"] || "",
+        lastModifiedGrade: student["Last modified (grade)"] || "",
         feedback: student["Feedback comments"] || "",
-        appliedIds: [],
+        appliedIds: []
       }))
     );
+
+    // Track the change
+    onChangeTracked?.({
+      type: 'auto-save',
+      timestamp: new Date().toISOString(),
+      message: 'CSV data imported',
+      oldValue: '',
+      newValue: ''
+    });
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -101,17 +119,31 @@ export const useCSVHandling = (
 
       const csvRows = [
         [
+          "Identifier",
           "Full name",
+          "ID number",
           "Email address",
-          "Last modified (submission)",
+          "Status",
           "Grade",
+          "Maximum Grade",
+          "Grade can be changed",
+          "Last modified (submission)",
+          "Online text",
+          "Last modified (grade)",
           "Feedback comments"
         ],
         ...students.map(student => [
+          student.identifier,
           student.name,
+          student.idNumber,
           student.email,
-          student.timestamp,
+          student.status,
           student.grade,
+          student.maxGrade,
+          student.gradeCanBeChanged,
+          student.lastModifiedSubmission,
+          student.onlineText,
+          student.lastModifiedGrade,
           student.feedback
         ])
       ];
@@ -121,7 +153,8 @@ export const useCSVHandling = (
       const defaultFilename = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_grades.csv`;
       
       saveAs(blob, defaultFilename);
-    } catch (error) {
+    } catch (err: unknown) {
+      console.error('CSV parsing error:', err);
       setError("Error exporting the CSV file.");
     }
   };

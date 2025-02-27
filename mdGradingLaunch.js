@@ -24,7 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
           // Get student submissions from the table
           const rows = document.querySelectorAll('table.generaltable > tbody > tr');
-          console.log('Found rows:', rows.length);
 
           rows.forEach((row, index) => {
             const cells = row.getElementsByTagName('td');
@@ -34,26 +33,41 @@ document.addEventListener('DOMContentLoaded', function() {
               const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
               const nameText = rawNameText.replace('Select', '').trim();
               
-              // Get feedback from Feedback comments column
-              const feedbackText = cells[11] ? cells[11].textContent.trim() : '';
+              // Get email by searching for a cell containing an email address
+              const emailCell = Array.from(cells).find(cell => {
+                const text = cell.textContent.trim();
+                return text.includes('@bobeldyk.us') || text.includes('@calvin.edu');
+              });
+              const emailText = emailCell ? emailCell.textContent.trim() : '';
               
-              // Get grade from Final grade column
-              const gradeText = cells[14] ? cells[14].textContent.trim() : '-';
+              // Get feedback from Feedback comments column and clean it
+              const rawFeedback = cells[11] ? cells[11].textContent.replace(/\s+/g, ' ').trim() : '';
+              const feedbackText = rawFeedback === '-' ? '' : rawFeedback;
+              
+              // Get grade from Final grade column and clean it
+              const rawGrade = cells[14] ? cells[14].textContent.replace(/\s+/g, ' ').trim() : '';
+              const gradeText = rawGrade === '-' ? '' : rawGrade;
 
               if (nameText) {
                 const studentData = {
                   name: encodeURIComponent(nameText),
-                  grade: encodeURIComponent(gradeText),
-                  feedback: encodeURIComponent(feedbackText),
+                  email: encodeURIComponent(emailText),
+                  grade: encodeURIComponent(gradeText || ''),
+                  feedback: encodeURIComponent(feedbackText || ''),
                   appliedIds: []
                 };
+                // Debug log to verify data
+                console.log('Student data before push:', {
+                  name: nameText,
+                  email: emailText,
+                  grade: gradeText || '',
+                  feedback: feedbackText || ''
+                });
                 data.studentData.push(studentData);
               }
             }
           });
 
-          // Debug log to see exact data structure
-          console.log('Data being sent:', JSON.parse(JSON.stringify(data)));
           return data;
         }
 

@@ -1,104 +1,122 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Feedback from './components/Feedback/Feedback';
 import StudentList from './components/StudentList/StudentList';
 import { HashRouter as Router, Route, Routes, useNavigate } from 'react-router-dom';
 import AboutPage from './components/About/About';
+import { Student, ChangeRecord, FeedbackItem } from '@/components/StudentList/types';
+import ChangeHistoryPanel from './components/StudentList/components/ChangeHistoryPanel';
 
-interface Student {
-  name: string;
-  email: string;
-  timestamp: string;
-  grade: string;
-  feedback: string;
-  appliedIds: number[];
-}
+const AUTO_SAVE_KEY = 'grading_autosave';
+const MAX_CHANGES = 50;
 
-interface FeedbackItem {
-  id: number;
-  comment: string;
-  grade: number;
-  applied?: boolean;
-}
-
-interface ApplyFeedbackParams {
-  feedbackItem: FeedbackItem;
-  allFeedbackItems: FeedbackItem[];
-}
+const defaultFeedback: FeedbackItem[] = [
+  { id: 1, comment: "Add more comments", grade: 3 },
+  { id: 2, comment: "Poor indentation", grade: 2 },
+  { id: 3, comment: "Looks good!", grade: 0 },
+  { id: 4, comment: "No submission", grade: 20 },
+];
 
 const MainApp = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [assignmentName, setAssignmentName] = useState<string>("Assignment 1");
+  const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(defaultFeedback);
+  
+  const [changeHistory, setChangeHistory] = useState<ChangeRecord[]>([]);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
 
-  // State to manage all feedback items
-  const [feedbackItems] = useState<FeedbackItem[]>([]);
+  useEffect(() => {
+    const savedData = localStorage.getItem(AUTO_SAVE_KEY);
+    if (savedData) {
+      try {
+        const { students: savedStudents, feedbackItems: savedFeedback, assignmentName: savedName, timestamp } = JSON.parse(savedData);
+        
+        const lastSaveDate = new Date(timestamp);
+        const shouldRestore = window.confirm(
+          `Found auto-saved data from ${lastSaveDate.toLocaleString()}. Would you like to restore it?`
+        );
 
-  const handleStudentSelect = (studentName: string) => {
-    setSelectedStudent(studentName);
+        if (shouldRestore) {
+          setStudents(savedStudents);
+          if (Array.isArray(savedFeedback) && savedFeedback.length > 0) {
+            setFeedbackItems(savedFeedback);
+          }
+          setAssignmentName(savedName);
+          setLastSaved(lastSaveDate);
+        } else {
+          localStorage.removeItem(AUTO_SAVE_KEY);
+        }
+      } catch (error) {
+        console.error('Error loading auto-saved data:', error);
+      }
+    }
+  }, []);
+
+  const handleChangeTracked = (change: ChangeRecord) => {
+    setChangeHistory(prev => {
+      let message;
+      if (change.type === 'grade') {
+        message = `${change.studentName}: ${change.oldValue} → ${change.newValue} points`;
+      } else if (change.type === 'feedback') {
+        const oldValue = change.oldValue as { grade: string; feedback: string; appliedIds: number[] };
+        const newValue = change.newValue as { grade: string; feedback: string; appliedIds: number[] };
+        message = `${change.studentName}: ${oldValue.grade} → ${newValue.grade} points`;
+      } else {
+        message = `Auto-saved at ${new Date().toLocaleTimeString()}`;
+      }
+
+      const newChange = {
+        ...change,
+        message,
+        timestamp: new Date().toISOString()
+      };
+
+      if (prev.length > 0) {
+        const lastChange = prev[0];
+        if (
+          lastChange.studentName === change.studentName &&
+          lastChange.type === change.type &&
+          Math.abs(new Date(lastChange.timestamp).getTime() - Date.now()) < 1000
+        ) {
+          return prev;
+        }
+      }
+      return [newChange, ...prev.slice(0, MAX_CHANGES - 1)];
+    });
   };
 
-  const handleApplyFeedback = ({ feedbackItem, allFeedbackItems }: ApplyFeedbackParams) => {
-    if (!selectedStudent) return;
+  const handleRevertChange = (change: ChangeRecord) => {
+    if (!change.studentName) return;
 
     setStudents(prevStudents =>
       prevStudents.map(student => {
-        if (student.name === selectedStudent) {
-          if (student.appliedIds.includes(feedbackItem.id)) {
-            // Remove the feedback
-            const feedbackLines = student.feedback
-              .split('\n')
-              .filter(line => line.trim() !== feedbackItem.comment.trim())
-              .filter(line => line.trim() !== '')
-              .join('\n\n');
-
-            // Calculate new grade
-            const remainingIds = student.appliedIds.filter(id => id !== feedbackItem.id);
-            if (remainingIds.length === 0) {
-              return {
-                ...student,
-                grade: "",
-                feedback: feedbackLines || "", // Ensure empty string if no feedback
-                appliedIds: remainingIds,
-              };
-            }
-
-            const totalDeduction = allFeedbackItems
-              .filter((item: FeedbackItem) => remainingIds.includes(item.id))
-              .reduce((sum: number, item: FeedbackItem) => sum + item.grade, 0);
-            const newGrade = Math.max(0, 20 - totalDeduction);
-
+        if (student.name === change.studentName) {
+          if (change.type === 'grade') {
+            return { ...student, grade: change.oldValue as string };
+          } else if (change.type === 'feedback') {
+            const oldValue = change.oldValue as { grade: string; feedback: string; appliedIds: number[] };
             return {
               ...student,
-              grade: newGrade.toString(),
-              feedback: feedbackLines || "",
-              appliedIds: remainingIds,
-            };
-          } else {
-            // Apply the feedback
-            const newAppliedIds = [...student.appliedIds, feedbackItem.id];
-            const totalDeduction = allFeedbackItems
-              .filter((item: FeedbackItem) => newAppliedIds.includes(item.id))
-              .reduce((sum: number, item: FeedbackItem) => sum + item.grade, 0);
-            const newGrade = Math.max(0, 20 - totalDeduction);
-
-            // New feedback with line break
-            const newFeedback = student.feedback
-              ? `${student.feedback.trim()}\n\n${feedbackItem.comment.trim()}`
-              : feedbackItem.comment.trim();
-
-            return {
-              ...student,
-              grade: newGrade.toString(),
-              feedback: newFeedback,
-              appliedIds: newAppliedIds,
+              grade: oldValue.grade,
+              feedback: oldValue.feedback,
+              appliedIds: oldValue.appliedIds
             };
           }
         }
         return student;
       })
     );
+
+    const changeIndex = changeHistory.findIndex(c => 
+      c.timestamp === change.timestamp && 
+      c.studentName === change.studentName
+    );
+    if (changeIndex !== -1) {
+      setChangeHistory(prev => prev.slice(changeIndex + 1));
+    }
   };
 
   const handleFeedbackEdit = (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => {
@@ -141,6 +159,27 @@ const MainApp = () => {
       >
         About Us
       </button>
+
+      <button 
+        onClick={() => setIsChangeHistoryVisible(!isChangeHistoryVisible)}
+        className="absolute top-16 right-4 text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-between"
+      >
+        <span>{isChangeHistoryVisible ? 'Hide Changes' : 'Show Changes'}</span>
+        <span className="bg-gray-700 px-2 py-0.5 rounded-full text-sm">
+          {changeHistory.length}
+        </span>
+      </button>
+
+      {/* Change History Panel */}
+      {isChangeHistoryVisible && (
+        <ChangeHistoryPanel
+          changeHistory={changeHistory}
+          onClose={() => setIsChangeHistoryVisible(false)}
+          onRevert={handleRevertChange}
+        />
+      )}
+
+      {/* Main content */}
       <header>
         <div>
           <h1>Grading Assistant</h1>
@@ -156,10 +195,13 @@ const MainApp = () => {
       <main>
         <div className="left">
           <Feedback
-            onApplyFeedback={handleApplyFeedback}
             selectedStudent={selectedStudent}
             appliedIds={students.find(s => s.name === selectedStudent)?.appliedIds || []}
             onFeedbackEdit={handleFeedbackEdit}
+            feedbackItems={feedbackItems}
+            setFeedbackItems={setFeedbackItems}
+            students={students}
+            onStudentsUpdate={setStudents}
           />
         </div>
         <div className="right">
@@ -167,11 +209,23 @@ const MainApp = () => {
             students={students}
             setStudents={setStudents}
             selectedStudent={selectedStudent}
-            onStudentSelect={handleStudentSelect}
+            onStudentSelect={setSelectedStudent}
             assignmentName={assignmentName}
+            setAssignmentName={setAssignmentName}
+            feedbackItems={feedbackItems}
+            setFeedbackItems={setFeedbackItems}
+            changeHistory={changeHistory}
+            onChangeTracked={handleChangeTracked}
+            onRevertChange={handleRevertChange}
           />
         </div>
       </main>
+      
+      {lastSaved && (
+        <div className="fixed bottom-4 right-4 text-sm text-gray-500">
+          Last saved: {lastSaved.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 };

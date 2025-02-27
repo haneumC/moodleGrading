@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import { Student } from '@/components/StudentList/types';
 
 interface FeedbackItem {
   id: number;
@@ -23,21 +24,29 @@ type SortField = 'text' | 'deduction' | 'applied';
 type SortDirection = 'asc' | 'desc';
 
 interface FeedbackProps {
-  onApplyFeedback: (params: { feedbackItem: FeedbackItem; allFeedbackItems: FeedbackItem[] }) => void;
   selectedStudent: string | null;
   appliedIds: number[];
   onFeedbackEdit: (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => void;
+  feedbackItems: FeedbackItem[];
+  setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
+  students: Student[];
+  onStudentsUpdate: (students: Student[]) => void;
 }
 
-const Feedback: React.FC<FeedbackProps> = ({ onApplyFeedback, selectedStudent, appliedIds, onFeedbackEdit }) => {
-  const defaultFeedback: FeedbackItem[] = [
-    { id: 1, comment: "Add more comments", grade: 3},
-    { id: 2, comment: "Poor indentation", grade: 2},
-    { id: 3, comment: "Looks good!", grade: 0},
-    { id: 4, comment: "No submission", grade: 20},
-  ];
+interface ApplyFeedbackParams {
+  feedbackItem: FeedbackItem;
+  allFeedbackItems: FeedbackItem[];
+}
 
-  const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(defaultFeedback);
+const Feedback: React.FC<FeedbackProps> = ({ 
+  selectedStudent, 
+  appliedIds, 
+  onFeedbackEdit,
+  feedbackItems,
+  setFeedbackItems,
+  students,
+  onStudentsUpdate
+}) => {
   const [isAddingFeedback, setIsAddingFeedback] = useState(false);
   const [newFeedback, setNewFeedback] = useState<Omit<FeedbackItem, 'id' | 'applied'>>({ 
     comment: "", 
@@ -50,6 +59,55 @@ const Feedback: React.FC<FeedbackProps> = ({ onApplyFeedback, selectedStudent, a
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [reusableIds, setReusableIds] = useState<number[]>([]);
   const [nextId, setNextId] = useState<number>(5);
+
+  const handleApplyFeedback = ({ feedbackItem, allFeedbackItems }: ApplyFeedbackParams) => {
+    if (!selectedStudent) return;
+
+    const updatedStudents = students.map(student => {
+      if (student.name === selectedStudent) {
+        if (student.appliedIds.includes(feedbackItem.id)) {
+          const feedbackLines = student.feedback
+            .split('\n')
+            .filter((line: string) => line.trim() !== feedbackItem.comment.trim())
+            .filter((line: string) => line.trim() !== '')
+            .join('\n\n');
+
+          const remainingIds = student.appliedIds.filter((id: number) => id !== feedbackItem.id);
+          const totalDeduction = allFeedbackItems
+            .filter((item: FeedbackItem) => remainingIds.includes(item.id))
+            .reduce((sum: number, item: FeedbackItem) => sum + item.grade, 0);
+          const newGrade = Math.max(0, 20 - totalDeduction).toString();
+
+          return {
+            ...student,
+            grade: newGrade,
+            feedback: feedbackLines || "",
+            appliedIds: remainingIds,
+          };
+        } else {
+          const newFeedback = student.feedback
+            ? `${student.feedback}\n\n${feedbackItem.comment}`
+            : feedbackItem.comment;
+
+          const newAppliedIds = [...student.appliedIds, feedbackItem.id];
+          const totalDeduction = allFeedbackItems
+            .filter(item => newAppliedIds.includes(item.id))
+            .reduce((sum, item) => sum + item.grade, 0);
+          const newGrade = Math.max(0, 20 - totalDeduction).toString();
+
+          return {
+            ...student,
+            grade: newGrade,
+            feedback: newFeedback,
+            appliedIds: newAppliedIds,
+          };
+        }
+      }
+      return student;
+    });
+
+    onStudentsUpdate(updatedStudents);
+  };
 
   const handleAddFeedback = () => {
     if (newFeedback.comment.trim()) {
@@ -148,7 +206,7 @@ const Feedback: React.FC<FeedbackProps> = ({ onApplyFeedback, selectedStudent, a
   };
 
   return (
-    <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-200px)] flex flex-col mt-5">
+    <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-380px)] flex flex-col mt-5">
       <div className="overflow-y-auto flex-1 mb-4">
         <Table>
           <TableHeader className="border-b border-[#444]">
@@ -257,12 +315,10 @@ const Feedback: React.FC<FeedbackProps> = ({ onApplyFeedback, selectedStudent, a
                         variant="ghost"
                         size="icon"
                         disabled={!selectedStudent}
-                        onClick={() => {
-                          onApplyFeedback({
-                            feedbackItem: item,
-                            allFeedbackItems: feedbackItems
-                          });
-                        }}
+                        onClick={() => handleApplyFeedback({
+                          feedbackItem: item,
+                          allFeedbackItems: feedbackItems
+                        })}
                         className={`w-6 h-6 ${
                           selectedStudent && appliedIds.includes(item.id)
                             ? 'bg-white text-[#4CAF50]' 

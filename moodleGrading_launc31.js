@@ -22,6 +22,14 @@ document.addEventListener('DOMContentLoaded', function() {
             data.assignmentName = encodeURIComponent(assignmentTitle.textContent.trim());
           }
 
+          // Get table headers first to map column indices
+          const headerRow = document.querySelector('table.generaltable > thead > tr');
+          const headerCells = headerRow ? headerRow.getElementsByTagName('th') : [];
+          const columnMap = {};
+          Array.from(headerCells).forEach((cell, index) => {
+            columnMap[cell.textContent.trim()] = index;
+          });
+
           // Get student submissions from the table
           const rows = document.querySelectorAll('table.generaltable > tbody > tr');
 
@@ -29,41 +37,37 @@ document.addEventListener('DOMContentLoaded', function() {
             const cells = row.getElementsByTagName('td');
 
             if (cells.length > 0) {
-              // Get the full name
-              const rawNameText = cells[0] ? cells[0].textContent.trim() : '';
-              const nameText = rawNameText.replace('Select', '').trim();
-              
-              // Get email by searching for a cell containing an email address
-              const emailCell = Array.from(cells).find(cell => {
-                const text = cell.textContent.trim();
-                return text.includes('@bobeldyk.us') || text.includes('@calvin.edu');
-              });
-              const emailText = emailCell ? emailCell.textContent.trim() : '';
-              
-              // Get feedback from Feedback comments column and clean it
-              const rawFeedback = cells[11] ? cells[11].textContent.replace(/\s+/g, ' ').trim() : '';
-              const feedbackText = rawFeedback === '-' ? '' : rawFeedback;
-              
-              // Get grade from Final grade column and clean it
-              const rawGrade = cells[14] ? cells[14].textContent.replace(/\s+/g, ' ').trim() : '';
-              const gradeText = rawGrade === '-' ? '' : rawGrade;
+              // Get all fields from the row
+              const studentData = {
+                identifier: cells[columnMap['Identifier']]?.textContent.trim() || '',
+                name: cells[columnMap['Full name']]?.textContent.replace('Select', '').trim() || '',
+                idNumber: cells[columnMap['ID number']]?.textContent.trim() || '',
+                email: cells[columnMap['Email address']]?.textContent.trim() || '',
+                status: cells[columnMap['Status']]?.textContent.trim() || '',
+                grade: cells[columnMap['Grade']]?.textContent.trim() || '',
+                maxGrade: cells[columnMap['Maximum Grade']]?.textContent.trim() || '',
+                gradeCanBeChanged: cells[columnMap['Grade can be changed']]?.textContent.trim() || '',
+                lastModifiedSubmission: cells[columnMap['Last modified (submission)']]?.textContent.trim() || '',
+                onlineText: cells[columnMap['Online text']]?.textContent.trim() || '',
+                lastModifiedGrade: cells[columnMap['Last modified (grade)']]?.textContent.trim() || '',
+                feedback: cells[columnMap['Feedback comments']]?.textContent.trim() || ''
+              };
 
-              if (nameText) {
-                const studentData = {
-                  name: encodeURIComponent(nameText),
-                  email: encodeURIComponent(emailText),
-                  grade: encodeURIComponent(gradeText || ''),
-                  feedback: encodeURIComponent(feedbackText || ''),
-                  appliedIds: []
-                };
-                // Debug log to verify data
-                console.log('Student data before push:', {
-                  name: nameText,
-                  email: emailText,
-                  grade: gradeText || '',
-                  feedback: feedbackText || ''
-                });
-                data.studentData.push(studentData);
+              // Clean up specific fields
+              if (studentData.grade === '-') studentData.grade = '';
+              if (studentData.feedback === '-') studentData.feedback = '';
+
+              // Encode all fields
+              const encodedData = {};
+              Object.entries(studentData).forEach(([key, value]) => {
+                encodedData[key] = encodeURIComponent(value);
+              });
+
+              // Add appliedIds for the UI
+              encodedData.appliedIds = [];
+
+              if (studentData.name) {
+                data.studentData.push(encodedData);
               }
             }
           });
