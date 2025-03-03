@@ -32,6 +32,8 @@ const MainApp = () => {
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
   const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [initialSaveComplete, setInitialSaveComplete] = useState(false);
+  const [isAutoSave, setIsAutoSave] = useState<boolean>(false);
+  const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState<boolean>(false);
 
   useEffect(() => {
     const savedData = localStorage.getItem(AUTO_SAVE_KEY);
@@ -191,7 +193,7 @@ const MainApp = () => {
     );
   };
 
-  const saveData = async (showStatus: boolean = false) => {
+  const saveData = async (showStatus: boolean = false, isAuto: boolean = false) => {
     try {
       const saveData = {
         students,
@@ -260,6 +262,17 @@ const MainApp = () => {
 
       if (showStatus) {
         setLastSaved(new Date());
+        setIsAutoSave(isAuto);
+        
+        if (isAuto) {
+          // Show the auto-save indicator
+          setShowAutoSaveIndicator(true);
+          
+          // Hide it after 3 seconds
+          setTimeout(() => {
+            setShowAutoSaveIndicator(false);
+          }, 3000);
+        }
       }
       
       return true;
@@ -273,7 +286,7 @@ const MainApp = () => {
   useEffect(() => {
     if (students.length > 0 && savedFileHandle) {
       const intervalId = setInterval(() => {
-        saveData(true);
+        saveData(true, true);
       }, 30000); // Auto-save every 30 seconds
       
       return () => clearInterval(intervalId);
@@ -297,33 +310,51 @@ const MainApp = () => {
           setFeedbackItems(data.feedbackItems);
         }
         
-        // Create a file handle for the loaded file if possible
+        // Set initialSaveComplete to true so we don't prompt for a new file
+        setInitialSaveComplete(true);
+        
+        // If we're in a browser that supports the File System Access API
         if ('showSaveFilePicker' in window) {
           try {
-            const options = {
-              suggestedName: file.name,
+            // Instead of prompting for a new file, we'll use the file that was just loaded
+            // We'll create a file handle for it
+            const fileHandle = await window.showOpenFilePicker({
+              id: 'grading-assistant',
+              startIn: 'downloads',
               types: [{
                 description: 'JSON Files',
                 accept: { 'application/json': ['.json'] },
               }],
-            };
-
-            const handle = await window.showSaveFilePicker(options);
-            setSavedFileHandle(handle);
-            localStorage.setItem(SAVE_HANDLE_KEY, handle.name);
-            setInitialSaveComplete(true);
+              multiple: false,
+            });
             
-            // Immediately save to this file to ensure we have write access
-            const writable = await handle.createWritable();
-            await writable.write(content);
-            await writable.close();
+            if (fileHandle && fileHandle[0]) {
+              setSavedFileHandle(fileHandle[0]);
+              localStorage.setItem(SAVE_HANDLE_KEY, fileHandle[0].name);
+              console.log('File handle created for loaded file');
+            }
           } catch (err) {
             console.error('Error creating file handle for loaded file:', err);
+            // Even if we can't create a file handle, we still want to avoid prompting for a new file
+            localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify({
+              students: data.students,
+              assignmentName: data.assignmentName,
+              timestamp: new Date().toISOString(),
+              feedbackItems: data.feedbackItems
+            }));
           }
+        } else {
+          // For browsers without File System Access API, save to localStorage
+          localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify({
+            students: data.students,
+            assignmentName: data.assignmentName,
+            timestamp: new Date().toISOString(),
+            feedbackItems: data.feedbackItems
+          }));
         }
         
         // Track the import
-        onChangeTracked({
+        handleChangeTracked({
           type: 'import',
           studentName: 'System',
           timestamp: new Date().toISOString(),
@@ -341,7 +372,7 @@ const MainApp = () => {
   };
 
   const handleSaveProgress = async () => {
-    return await saveData(true);
+    return await saveData(true, false);
   };
 
   return (
@@ -362,6 +393,21 @@ const MainApp = () => {
           {changeHistory.length}
         </span>
       </button>
+
+      {/* Auto-save indicator with animation */}
+      {showAutoSaveIndicator && (
+        <div className="absolute top-28 right-4 text-sm text-green-400 flex items-center transition-opacity duration-300">
+          <span>Auto-saved</span>
+          <span className="ml-2 text-green-500 text-lg">✓</span>
+        </div>
+      )}
+
+      {/* Regular last saved indicator */}
+      {lastSaved && !showAutoSaveIndicator && (
+        <div className="absolute top-28 right-4 text-sm text-gray-300">
+          <span>Last saved: {lastSaved.toLocaleTimeString()}</span>
+        </div>
+      )}
 
       {/* Change History Panel */}
       {isChangeHistoryVisible && (
@@ -413,12 +459,6 @@ const MainApp = () => {
           />
         </div>
       </main>
-      {/* Remove the button but keep the last saved indicator */}
-      {lastSaved && (
-        <div className="fixed bottom-4 right-4 text-sm text-gray-500">
-          Last saved: {lastSaved.toLocaleTimeString()}
-        </div>
-      )}
     </div>
   );
 };
