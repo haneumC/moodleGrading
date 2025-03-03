@@ -40,6 +40,7 @@ export interface StudentListProps {
   feedbackItems: FeedbackItem[];
   setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
   onChangeTracked: (change: ChangeRecord) => void;
+  onSaveProgress?: () => Promise<boolean>;
 }
 
 export interface SaveData {

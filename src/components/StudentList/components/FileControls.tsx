@@ -22,6 +22,11 @@ const FileControls: React.FC<FileControlsProps> = ({
   showAutoSaveStatus,
   hasData
 }) => {
+  const handleSaveProgress = async () => {
+    // Save to localStorage instead of prompting for a file
+    await onSaveProgress();
+  };
+
   return (
     <>
       <div className="buttons">
@@ -47,7 +52,7 @@ const FileControls: React.FC<FileControlsProps> = ({
         </button>
         <button 
           className="studentBtn" 
-          onClick={onSaveProgress}
+          onClick={handleSaveProgress}
           disabled={!hasData}
           style={{ opacity: hasData ? 1 : 0.5, cursor: hasData ? 'pointer' : 'not-allowed' }}
         >

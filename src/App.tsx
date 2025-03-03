@@ -64,12 +64,14 @@ const MainApp = () => {
   useEffect(() => {
     const handleId = localStorage.getItem(SAVE_HANDLE_KEY);
     if (handleId) {
-      // Request permission to use the file handle
+      // Attempt to restore the file handle
       navigator.storage?.getDirectory?.()?.then(async (root) => {
         try {
           const handle = await root.getFileHandle(handleId);
           if (handle) {
             setSavedFileHandle(handle);
+            setInitialSaveComplete(true);
+            console.log('File handle restored successfully');
           }
         } catch (err) {
           console.error('Could not restore file handle:', err);
@@ -199,8 +201,8 @@ const MainApp = () => {
       };
       const jsonString = JSON.stringify(saveData, null, 2);
 
-      // Only prompt for save location on first save
-      if (!initialSaveComplete) {
+      if (!savedFileHandle) {
+        // No file handle exists, prompt user to save a new file
         if ('showSaveFilePicker' in window) {
           try {
             const options = {
@@ -219,60 +221,128 @@ const MainApp = () => {
             const writable = await handle.createWritable();
             await writable.write(jsonString);
             await writable.close();
+            console.log('Data saved to new file');
           } catch (err) {
-            console.error('Save error:', err);
-            return; // Don't proceed if user cancels initial save
+            if (err.name === 'AbortError') {
+              console.log('Save operation was cancelled by the user.');
+              return false; // Exit if the user cancels the save dialog
+            } else {
+              console.error('Save error:', err);
+              return false;
+            }
           }
         } else {
           // Fallback for browsers without File System API
-          const blob = new Blob([jsonString], { type: 'application/json' });
-          saveAs(blob, `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`);
-          setInitialSaveComplete(true);
+          try {
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            saveAs(blob, `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`);
+            setInitialSaveComplete(true);
+          } catch (err) {
+            console.error('Error saving file:', err);
+            return false;
+          }
         }
-      } else if (savedFileHandle) {
-        // Use existing file handle for subsequent saves
-        const writable = await savedFileHandle.createWritable();
-        await writable.write(jsonString);
-        await writable.close();
+      } else {
+        // File handle exists, save to the existing file
+        try {
+          const writable = await savedFileHandle.createWritable();
+          await writable.write(jsonString);
+          await writable.close();
+          console.log('Data saved to existing file');
+        } catch (err) {
+          console.error('Error saving to existing file:', err);
+          // If permission was revoked or file is no longer accessible
+          setSavedFileHandle(null);
+          localStorage.removeItem(SAVE_HANDLE_KEY);
+          return false;
+        }
       }
 
       if (showStatus) {
         setLastSaved(new Date());
       }
+      
+      return true;
     } catch (err) {
       console.error('Save error:', err);
+      return false;
     }
   };
 
-  // Modify the auto-save effect to only run after initial save
+  // Add auto-save functionality every 30 seconds
   useEffect(() => {
-    if (!initialSaveComplete) return;
+    if (students.length > 0 && savedFileHandle) {
+      const intervalId = setInterval(() => {
+        saveData(true);
+      }, 30000); // Auto-save every 30 seconds
+      
+      return () => clearInterval(intervalId);
+    }
+  }, [students, feedbackItems, assignmentName, savedFileHandle]);
 
-    const autoSave = async () => {
-      if (students.length > 0) {
-        await saveData(false);
+  // Handle loading progress from a file
+  const handleLoadProgress = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const data = JSON.parse(content) as SaveData;
+        
+        setStudents(data.students);
+        setAssignmentName(data.assignmentName);
+        if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
+          setFeedbackItems(data.feedbackItems);
+        }
+        
+        // Create a file handle for the loaded file if possible
+        if ('showSaveFilePicker' in window) {
+          try {
+            const options = {
+              suggestedName: file.name,
+              types: [{
+                description: 'JSON Files',
+                accept: { 'application/json': ['.json'] },
+              }],
+            };
+
+            const handle = await window.showSaveFilePicker(options);
+            setSavedFileHandle(handle);
+            localStorage.setItem(SAVE_HANDLE_KEY, handle.name);
+            setInitialSaveComplete(true);
+            
+            // Immediately save to this file to ensure we have write access
+            const writable = await handle.createWritable();
+            await writable.write(content);
+            await writable.close();
+          } catch (err) {
+            console.error('Error creating file handle for loaded file:', err);
+          }
+        }
+        
+        // Track the import
+        onChangeTracked({
+          type: 'import',
+          studentName: 'System',
+          timestamp: new Date().toISOString(),
+          message: 'Progress data imported',
+          oldValue: '',
+          newValue: ''
+        });
+        
+      } catch (error) {
+        console.error('Error parsing JSON:', error);
+        setError("Invalid progress file");
       }
     };
-    
-    const timeoutId = setTimeout(autoSave, 1000);
-    return () => clearTimeout(timeoutId);
-  }, [students, feedbackItems, assignmentName, initialSaveComplete]);
-
-  // Add a manual save button
-  const handleSaveProgress = async () => {
-    await saveData(true);
+    reader.readAsText(file);
   };
 
-  // Add periodic auto-save with status
-  useEffect(() => {
-    if (!initialSaveComplete) return;
-
-    const intervalId = setInterval(() => {
-      saveData(true);
-    }, AUTO_SAVE_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [initialSaveComplete]);
+  const handleSaveProgress = async () => {
+    return await saveData(true);
+  };
 
   return (
     <div className="grading-assistant relative">
@@ -339,24 +409,16 @@ const MainApp = () => {
             feedbackItems={feedbackItems}
             setFeedbackItems={setFeedbackItems}
             onChangeTracked={handleChangeTracked}
+            onSaveProgress={handleSaveProgress}
           />
         </div>
       </main>
-      
-      <div className="flex gap-2">
-        <button
-          onClick={handleSaveProgress}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          disabled={!students.length}
-        >
-          Save Progress
-        </button>
-        {lastSaved && (
-          <div className="fixed bottom-4 right-4 text-sm text-gray-500">
-            Last saved: {lastSaved.toLocaleTimeString()}
-          </div>
-        )}
-      </div>
+      {/* Remove the button but keep the last saved indicator */}
+      {lastSaved && (
+        <div className="fixed bottom-4 right-4 text-sm text-gray-500">
+          Last saved: {lastSaved.toLocaleTimeString()}
+        </div>
+      )}
     </div>
   );
 };

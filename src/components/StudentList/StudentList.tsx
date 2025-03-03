@@ -7,8 +7,8 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Table } from "@/components/ui/table";
-import { Student } from './types';  // Only import what we need
-import type { StudentListProps } from './types';  // Import type separately
+import { Student, StudentListProps, SaveData, FeedbackItem } from './types';  // Only import what we need
+import type { StudentListProps as StudentListPropsType } from './types';  // Import type separately
 import TableHeaderComponent from './components/TableHeader';
 import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
@@ -30,7 +30,7 @@ declare global {
   }
 }
 
-const StudentList: React.FC<StudentListProps> = ({
+const StudentList: React.FC<StudentListPropsType> = ({
   students,
   setStudents,
   selectedStudent,
@@ -39,7 +39,8 @@ const StudentList: React.FC<StudentListProps> = ({
   setAssignmentName,
   feedbackItems,
   setFeedbackItems,
-  onChangeTracked
+  onChangeTracked,
+  onSaveProgress
 }) => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [autoSaveStatus, setAutoSaveStatus] = useState<string>("");
@@ -104,102 +105,64 @@ const StudentList: React.FC<StudentListProps> = ({
     getSortedRowModel: getSortedRowModel(),
   });
 
+  // Handle saving progress to localStorage
   const handleSaveProgress = async () => {
     try {
-      const saveData = {
-        students,
-        assignmentName,
-        timestamp: new Date().toISOString(),
-        feedbackItems
-      };
-
-      const jsonString = JSON.stringify(saveData, null, 2);
-      const blob = new Blob([jsonString], { type: 'application/json' });
-      const filename = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
-
-      // Try modern File System API first
-      if ('showSaveFilePicker' in window) {
-        try {
-          const options = {
-            suggestedName: filename,
-            types: [
-              {
-                description: 'JSON Files',
-                accept: {
-                  'application/json': ['.json']
-                },
-              },
-            ],
-          };
-
-          const handle = await window.showSaveFilePicker(options);
-          const writable = await handle.createWritable();
-          await writable.write(jsonString);
-          await writable.close();
-        } catch (err: unknown) {  // Change _ to err since we're logging it
-          console.error('Save error:', err);
-          saveAs(blob, filename);
-        }
-      } else {
-        // Fallback for browsers that don't support File System API
-        saveAs(blob, filename);
+      // This will now call the saveData function from App.tsx
+      const success = await onSaveProgress();
+      
+      if (success) {
+        // Show success message
+        setAutoSaveStatus("Progress saved successfully");
+        setShowAutoSaveStatus(true);
+        
+        // Hide message after 3 seconds
+        setTimeout(() => {
+          setShowAutoSaveStatus(false);
+        }, 3000);
       }
-
-      setAutoSaveStatus("Progress saved successfully at " + new Date().toLocaleTimeString());
-      setShowAutoSaveStatus(true);
-      setError("");
-      setTimeout(() => setShowAutoSaveStatus(false), 3000);
-    } catch (err: unknown) {
+      
+      return success;
+    } catch (err) {
       console.error('Save error:', err);
-      setError("Failed to save progress. Please try again.");
-      setAutoSaveStatus("");
-      setShowAutoSaveStatus(false);
+      setError("Failed to save progress");
+      return false;
     }
   };
 
-  const handleLoadProgress = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const file = e.target.files?.[0];
-      if (!file) return;
+  // Handle loading progress from a file
+  const handleLoadProgress = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      const content = await file.text();
-      const saveData = JSON.parse(content);
-      
-      // Validate the loaded data structure
-      if (!saveData || typeof saveData !== 'object') {
-        throw new Error("Invalid save file format");
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        const data = JSON.parse(content) as SaveData;
+        
+        setStudents(data.students);
+        setAssignmentName(data.assignmentName);
+        if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
+          setFeedbackItems(data.feedbackItems);
+        }
+        
+        // Track the import
+        onChangeTracked({
+          type: 'import',
+          studentName: 'System',
+          timestamp: new Date().toISOString(),
+          message: 'Progress data imported',
+          oldValue: '',
+          newValue: ''
+        });
+        
+      } catch (error) {
+        console.error('Error parsing JSON:', error);
+        setError("Invalid progress file");
       }
-
-      // Validate and update students
-      if (Array.isArray(saveData.students)) {
-        setStudents(saveData.students);
-      } else {
-        throw new Error("Invalid students data in save file");
-      }
-      
-      // Only update feedback items if there are saved items
-      if (Array.isArray(saveData.feedbackItems) && saveData.feedbackItems.length > 0) {
-        setFeedbackItems(saveData.feedbackItems);
-      }
-
-      // Validate and update assignment name
-      if (typeof saveData.assignmentName === 'string') {
-        setAssignmentName(saveData.assignmentName);
-      }
-      
-      setAutoSaveStatus("Progress loaded successfully at " + new Date().toLocaleTimeString());
-      setShowAutoSaveStatus(true);
-      setError("");
-      setTimeout(() => setShowAutoSaveStatus(false), 3000);
-
-    } catch (err: unknown) {
-      console.error("Load error:", err);
-      setError("Failed to load progress file. Please check the file format.");
-      setAutoSaveStatus("");
-      setShowAutoSaveStatus(false);
-    } finally {
-      e.target.value = '';
-    }
+    };
+    reader.readAsText(file);
   };
 
   return (
