@@ -1,15 +1,15 @@
 export interface Student {
   name: string;
   email: string;
+  status?: string;
   grade: string;
+  lastModifiedSubmission?: string;
   feedback: string;
   appliedIds: number[];
   identifier?: string;
   idNumber?: string;
-  status?: string;
   maxGrade?: string;
   gradeCanBeChanged?: string;
-  lastModifiedSubmission?: string;
   onlineText?: string;
   lastModifiedGrade?: string;
 }

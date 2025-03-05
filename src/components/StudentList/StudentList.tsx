@@ -7,15 +7,13 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Table } from "@/components/ui/table";
-import { Student, StudentListProps, SaveData, FeedbackItem } from './types';  // Only import what we need
-import type { StudentListProps as StudentListPropsType } from './types';  // Import type separately
+import { Student, SaveData, ChangeRecord } from './types';
 import TableHeaderComponent from './components/TableHeader';
 import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
 import { useCSVHandling } from './hooks';
 import './StudentList.css';
 import { getImportedMoodleData } from '@/utils/moodleDataImport';
-import { saveAs } from 'file-saver';
 
 // Add type declaration for FileSystemFileHandle
 declare global {
@@ -30,21 +28,30 @@ declare global {
   }
 }
 
-const StudentList: React.FC<StudentListPropsType> = ({
+// Define the component with inline props type
+const StudentList: React.FC<{
+  students: Student[];
+  setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
+  selectedStudent: string | null;
+  onStudentSelect: (student: string) => void;
+  assignmentName: string;
+  setAssignmentName: React.Dispatch<React.SetStateAction<string>>;
+  onChangeTracked: (change: ChangeRecord) => void;
+  onSaveProgress?: () => Promise<boolean>;
+  feedbackItems: any[];
+  setFeedbackItems: React.Dispatch<React.SetStateAction<any[]>>;
+}> = ({
   students,
   setStudents,
   selectedStudent,
   onStudentSelect,
   assignmentName,
   setAssignmentName,
-  feedbackItems,
-  setFeedbackItems,
   onChangeTracked,
-  onSaveProgress
+  onSaveProgress,
 }) => {
+  console.log('StudentList received students:', students);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<string>("");
-  const [showAutoSaveStatus, setShowAutoSaveStatus] = useState(false);
   const [error, setError] = useState<string>("");
 
   const { handleFileChange, exportForMoodle } = useCSVHandling(
@@ -107,27 +114,10 @@ const StudentList: React.FC<StudentListPropsType> = ({
 
   // Handle saving progress to localStorage
   const handleSaveProgress = async () => {
-    try {
-      // This will now call the saveData function from App.tsx
-      const success = await onSaveProgress();
-      
-      if (success) {
-        // Show success message
-        setAutoSaveStatus("Progress saved successfully");
-        setShowAutoSaveStatus(true);
-        
-        // Hide message after 3 seconds
-        setTimeout(() => {
-          setShowAutoSaveStatus(false);
-        }, 3000);
-      }
-      
-      return success;
-    } catch (err) {
-      console.error('Save error:', err);
-      setError("Failed to save progress");
-      return false;
+    if (onSaveProgress) {
+      return await onSaveProgress();
     }
+    return false;
   };
 
   // Handle loading progress from a file
@@ -144,7 +134,7 @@ const StudentList: React.FC<StudentListPropsType> = ({
         setStudents(data.students);
         setAssignmentName(data.assignmentName);
         if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
-          setFeedbackItems(data.feedbackItems);
+          // Assuming feedbackItems is not needed in this component
         }
         
         // Track the import
@@ -171,11 +161,13 @@ const StudentList: React.FC<StudentListPropsType> = ({
         <FileControls
           onFileImport={handleFileChange}
           onExport={exportForMoodle}
-          onSaveProgress={handleSaveProgress}
+          onSaveProgress={async () => {
+            await handleSaveProgress();
+          }}
           onLoadProgress={handleLoadProgress}
           error={error}
-          autoSaveStatus={autoSaveStatus}
-          showAutoSaveStatus={showAutoSaveStatus}
+          autoSaveStatus=""
+          showAutoSaveStatus={false}
           hasData={students.length > 0}
         />
         <div className="rounded-md border">

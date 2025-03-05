@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import Feedback from './components/Feedback/Feedback';
 import StudentList from './components/StudentList/StudentList';
@@ -8,9 +8,7 @@ import { Student, ChangeRecord, FeedbackItem } from '@/components/StudentList/ty
 import ChangeHistoryPanel from './components/StudentList/components/ChangeHistoryPanel';
 import { saveAs } from 'file-saver';
 
-const AUTO_SAVE_KEY = 'grading_autosave';
 const MAX_CHANGES = 50;
-const AUTO_SAVE_INTERVAL = 3 * 60 * 1000; // 3 minutes in milliseconds
 const SAVE_HANDLE_KEY = 'save_handle_id';
 
 const defaultFeedback: FeedbackItem[] = [
@@ -19,6 +17,66 @@ const defaultFeedback: FeedbackItem[] = [
   { id: 3, comment: "Looks good!", grade: 0 },
   { id: 4, comment: "No submission", grade: 20 },
 ];
+
+interface MoodleMessage {
+  type: 'MOODLE_DATA';
+  data: {
+    assignmentName: string;
+    students: MoodleStudent[];
+    timestamp: string;
+  };
+}
+
+interface StorageData {
+  moodleGradingData?: {
+    assignmentName: string;
+    students: MoodleStudent[];
+    timestamp: string;
+  };
+}
+
+declare global {
+  interface Window {
+    chrome: {
+      runtime: {
+        onMessage: {
+          addListener: (callback: (message: MoodleMessage, sender: unknown, sendResponse: () => void) => void) => void;
+          removeListener: (callback: (message: MoodleMessage, sender: unknown, sendResponse: () => void) => void) => void;
+        };
+        sendMessage: (message: MoodleMessage) => void;
+      };
+      storage: {
+        local: {
+          get: (keys: string[], callback: (result: StorageData) => void) => void;
+          set: (items: StorageData, callback?: () => void) => void;
+          remove: (keys: string | string[], callback?: () => void) => void;
+        };
+      };
+    };
+    showOpenFilePicker: (options?: {
+      id?: string;
+      startIn?: string;
+      types?: Array<{
+        description: string;
+        accept: Record<string, string[]>;
+      }>;
+      multiple?: boolean;
+    }) => Promise<FileSystemFileHandle[]>;
+  }
+}
+
+type MoodleStudent = {
+  name: string;
+  email: string;
+  idNumber?: string;
+  status?: string;
+  grade?: string;
+  lastModifiedSubmission?: string;
+  feedback?: string;
+  appliedIds?: number[];
+  onlineText?: string;
+  lastModifiedGrade?: string;
+}
 
 const MainApp = () => {
   const navigate = useNavigate();
@@ -31,34 +89,52 @@ const MainApp = () => {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
   const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
-  const [initialSaveComplete, setInitialSaveComplete] = useState(false);
-  const [isAutoSave, setIsAutoSave] = useState<boolean>(false);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState<boolean>(false);
 
   useEffect(() => {
-    const savedData = localStorage.getItem(AUTO_SAVE_KEY);
-    if (savedData) {
-      try {
-        const { students: savedStudents, feedbackItems: savedFeedback, assignmentName: savedName, timestamp } = JSON.parse(savedData);
-        
-        const lastSaveDate = new Date(timestamp);
-        const shouldRestore = window.confirm(
-          `Found auto-saved data from ${lastSaveDate.toLocaleString()}. Would you like to restore it?`
-        );
-
-        if (shouldRestore) {
-          setStudents(savedStudents);
-          if (Array.isArray(savedFeedback) && savedFeedback.length > 0) {
-            setFeedbackItems(savedFeedback);
+    // Check chrome.storage.local for data
+    if (window.chrome?.storage?.local) {
+      window.chrome.storage.local.get(['moodleGradingData'], (result) => {
+        if (result.moodleGradingData) {
+          try {
+            const parsedData = result.moodleGradingData;
+            console.log('Found Moodle data:', parsedData);
+            
+            if (parsedData.students && Array.isArray(parsedData.students)) {
+              console.log('Found valid students array:', parsedData.students);
+              
+              const transformedStudents: Student[] = parsedData.students.map((student: MoodleStudent) => ({
+                name: student.name || '',
+                email: student.email || '',
+                grade: student.grade || '',
+                feedback: student.feedback || '',
+                appliedIds: student.appliedIds || [],
+                identifier: student.idNumber || '',
+                idNumber: student.idNumber || '',
+                status: student.status || '',
+                lastModifiedSubmission: student.lastModifiedSubmission || '',
+                onlineText: student.onlineText || '',
+                lastModifiedGrade: student.lastModifiedGrade || '',
+                maxGrade: '20.00',
+                gradeCanBeChanged: 'Yes'
+              }));
+              
+              console.log('Setting students state with:', transformedStudents);
+              setStudents(transformedStudents);
+              
+              if (parsedData.assignmentName) {
+                console.log('Setting assignment name:', parsedData.assignmentName);
+                setAssignmentName(parsedData.assignmentName);
+              }
+            }
+            
+            // Clear the data after loading
+            window.chrome.storage.local.remove('moodleGradingData');
+          } catch (error) {
+            console.error('Error parsing Moodle data:', error);
           }
-          setAssignmentName(savedName);
-          setLastSaved(lastSaveDate);
-        } else {
-          localStorage.removeItem(AUTO_SAVE_KEY);
         }
-      } catch (error) {
-        console.error('Error loading auto-saved data:', error);
-      }
+      });
     }
   }, []);
 
@@ -72,7 +148,6 @@ const MainApp = () => {
           const handle = await root.getFileHandle(handleId);
           if (handle) {
             setSavedFileHandle(handle);
-            setInitialSaveComplete(true);
             console.log('File handle restored successfully');
           }
         } catch (err) {
@@ -80,16 +155,6 @@ const MainApp = () => {
           localStorage.removeItem(SAVE_HANDLE_KEY);
         }
       });
-    }
-  }, []);
-
-  useEffect(() => {
-    // Load data from extension storage
-    const moodleData = localStorage.getItem('moodleGradingData');
-    if (moodleData) {
-      const { assignmentName, students } = JSON.parse(moodleData);
-      setAssignmentName(assignmentName);
-      setStudents(students);
     }
   }, []);
 
@@ -193,7 +258,7 @@ const MainApp = () => {
     );
   };
 
-  const saveData = async (showStatus: boolean = false, isAuto: boolean = false) => {
+  const saveData = useCallback(async (showStatus: boolean = false, isAuto: boolean = false) => {
     try {
       const saveData = {
         students,
@@ -218,14 +283,13 @@ const MainApp = () => {
             const handle = await window.showSaveFilePicker(options);
             setSavedFileHandle(handle);
             localStorage.setItem(SAVE_HANDLE_KEY, handle.name);
-            setInitialSaveComplete(true);
 
             const writable = await handle.createWritable();
             await writable.write(jsonString);
             await writable.close();
             console.log('Data saved to new file');
           } catch (err) {
-            if (err.name === 'AbortError') {
+            if (err instanceof Error && err.name === 'AbortError') {
               console.log('Save operation was cancelled by the user.');
               return false; // Exit if the user cancels the save dialog
             } else {
@@ -238,7 +302,6 @@ const MainApp = () => {
           try {
             const blob = new Blob([jsonString], { type: 'application/json' });
             saveAs(blob, `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`);
-            setInitialSaveComplete(true);
           } catch (err) {
             console.error('Error saving file:', err);
             return false;
@@ -262,7 +325,6 @@ const MainApp = () => {
 
       if (showStatus) {
         setLastSaved(new Date());
-        setIsAutoSave(isAuto);
         
         if (isAuto) {
           // Show the auto-save indicator
@@ -280,96 +342,18 @@ const MainApp = () => {
       console.error('Save error:', err);
       return false;
     }
-  };
+  }, [students, feedbackItems, assignmentName, savedFileHandle]);
 
   // Add auto-save functionality every 30 seconds
   useEffect(() => {
     if (students.length > 0 && savedFileHandle) {
       const intervalId = setInterval(() => {
         saveData(true, true);
-      }, 30000); // Auto-save every 30 seconds
+      }, 30000);
       
       return () => clearInterval(intervalId);
     }
-  }, [students, feedbackItems, assignmentName, savedFileHandle]);
-
-  // Handle loading progress from a file
-  const handleLoadProgress = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const content = event.target?.result as string;
-        const data = JSON.parse(content) as SaveData;
-        
-        setStudents(data.students);
-        setAssignmentName(data.assignmentName);
-        if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
-          setFeedbackItems(data.feedbackItems);
-        }
-        
-        // Set initialSaveComplete to true so we don't prompt for a new file
-        setInitialSaveComplete(true);
-        
-        // If we're in a browser that supports the File System Access API
-        if ('showSaveFilePicker' in window) {
-          try {
-            // Instead of prompting for a new file, we'll use the file that was just loaded
-            // We'll create a file handle for it
-            const fileHandle = await window.showOpenFilePicker({
-              id: 'grading-assistant',
-              startIn: 'downloads',
-              types: [{
-                description: 'JSON Files',
-                accept: { 'application/json': ['.json'] },
-              }],
-              multiple: false,
-            });
-            
-            if (fileHandle && fileHandle[0]) {
-              setSavedFileHandle(fileHandle[0]);
-              localStorage.setItem(SAVE_HANDLE_KEY, fileHandle[0].name);
-              console.log('File handle created for loaded file');
-            }
-          } catch (err) {
-            console.error('Error creating file handle for loaded file:', err);
-            // Even if we can't create a file handle, we still want to avoid prompting for a new file
-            localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify({
-              students: data.students,
-              assignmentName: data.assignmentName,
-              timestamp: new Date().toISOString(),
-              feedbackItems: data.feedbackItems
-            }));
-          }
-        } else {
-          // For browsers without File System Access API, save to localStorage
-          localStorage.setItem(AUTO_SAVE_KEY, JSON.stringify({
-            students: data.students,
-            assignmentName: data.assignmentName,
-            timestamp: new Date().toISOString(),
-            feedbackItems: data.feedbackItems
-          }));
-        }
-        
-        // Track the import
-        handleChangeTracked({
-          type: 'import',
-          studentName: 'System',
-          timestamp: new Date().toISOString(),
-          message: 'Progress data imported',
-          oldValue: '',
-          newValue: ''
-        });
-        
-      } catch (error) {
-        console.error('Error parsing JSON:', error);
-        setError("Invalid progress file");
-      }
-    };
-    reader.readAsText(file);
-  };
+  }, [students, feedbackItems, assignmentName, savedFileHandle, saveData]);
 
   const handleSaveProgress = async () => {
     return await saveData(true, false);

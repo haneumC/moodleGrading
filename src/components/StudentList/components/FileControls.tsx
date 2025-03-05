@@ -4,7 +4,7 @@ import StatusMessage from '@/components/StatusMessage/StatusMessage';
 interface FileControlsProps {
   onFileImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExport: () => void;
-  onSaveProgress: () => Promise<void>;
+  onSaveProgress: () => Promise<boolean | void>;
   onLoadProgress: (e: React.ChangeEvent<HTMLInputElement>) => void;
   error: string;
   autoSaveStatus: string;
