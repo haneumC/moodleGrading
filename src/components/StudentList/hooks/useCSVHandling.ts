@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import Papa from 'papaparse';
+import Papa, { ParseResult } from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Student, ChangeRecord } from '../types';
 
@@ -11,20 +11,14 @@ export const useCSVHandling = (
 ) => {
   const [error, setError] = useState<string>("");
 
-  const validateCSV = (csvString: string): boolean => {
+  const validateCSV = (data: string[][]): boolean => {
     try {
-      const result = Papa.parse(csvString, {
-        header: false,
-        skipEmptyLines: true
-      });
-
-      if (result.errors.length > 0) {
-        setError("Error parsing the CSV file.");
+      if (data.length === 0) {
+        setError("Empty CSV file");
         return false;
       }
 
-      const output = result.data as string[][];
-      const headerRow: string[] = output[0];
+      const headerRow = data[0];
       const requiredHeaders: string[] = [
         "Full name",
         "Email address",
@@ -41,8 +35,8 @@ export const useCSVHandling = (
 
       return true;
     } catch (err: unknown) {
-      console.error('CSV parsing error:', err);
-      setError("Error parsing the CSV file.");
+      console.error('CSV validation error:', err);
+      setError("Error validating the CSV file.");
       return false;
     }
   };
@@ -80,14 +74,20 @@ export const useCSVHandling = (
 
     try {
       const content = await file.text();
-      if (validateCSV(content)) {
-        const rows = content.split('\n').map(row => row.split(','));
-        const students = processCSVData(rows);
-        setStudents(students);
-        trackImport();
-      }
+      Papa.parse(content, {
+        header: false,
+        skipEmptyLines: true,
+        complete: (results: ParseResult<string[]>) => {
+          if (validateCSV(results.data)) {
+            const students = processCSVData(results.data);
+            setStudents(students);
+            trackImport();
+          }
+        }
+      });
     } catch (error) {
       console.error('Error reading CSV:', error);
+      setError("Error reading the CSV file");
     }
   };
 
