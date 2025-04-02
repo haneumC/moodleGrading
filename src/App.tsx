@@ -91,6 +91,7 @@ const MainApp = () => {
   const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState<boolean>(false);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
+  const [selectedFeedbackId, setSelectedFeedbackId] = useState<number | null>(null);
 
   useEffect(() => {
     // Check chrome.storage.local for data
@@ -365,6 +366,28 @@ const MainApp = () => {
     setLastAutoSaveTime(time);
   };
 
+  // Function to handle feedback selection
+  const handleFeedbackSelect = (feedbackId: number | null) => {
+    console.log('App received feedback selection:', feedbackId);
+    
+    // Debug: Log all students who have this feedback applied
+    if (feedbackId !== null) {
+      const studentsWithFeedback = students.filter(student => 
+        Array.isArray(student.appliedIds) && student.appliedIds.includes(feedbackId)
+      );
+      console.log('Students with this feedback:', studentsWithFeedback.map(s => s.name));
+    }
+    
+    // Toggle selection if clicking the same feedback again
+    if (selectedFeedbackId === feedbackId) {
+      console.log('Deselecting feedback:', feedbackId);
+      setSelectedFeedbackId(null);
+    } else {
+      console.log('Selecting feedback:', feedbackId);
+      setSelectedFeedbackId(feedbackId);
+    }
+  };
+
   return (
     <div className="grading-assistant relative">
       <button 
@@ -426,6 +449,8 @@ const MainApp = () => {
             students={students}
             onStudentsUpdate={setStudents}
             onChangeTracked={handleChangeTracked}
+            onFeedbackSelect={handleFeedbackSelect}
+            selectedFeedbackId={selectedFeedbackId}
           />
         </div>
         <div className="right">
@@ -441,6 +466,8 @@ const MainApp = () => {
             onChangeTracked={handleChangeTracked}
             onSaveProgress={handleSaveProgress}
             onLastAutoSaveTimeUpdate={handleLastAutoSaveTimeUpdate}
+            selectedFeedbackId={selectedFeedbackId}
+            onFeedbackSelect={handleFeedbackSelect}
           />
         </div>
       </main>

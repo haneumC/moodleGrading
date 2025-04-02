@@ -1,7 +1,7 @@
 import { Student, ChangeRecord, FeedbackItem } from '@/components/StudentList/types';
 import { Dispatch, SetStateAction } from 'react';
 
-interface FeedbackProps {
+export interface FeedbackProps {
   selectedStudent: string | null;
   appliedIds: number[];
   onFeedbackEdit: (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => void;
@@ -10,6 +10,8 @@ interface FeedbackProps {
   students: Student[];
   onStudentsUpdate: (updater: (students: Student[]) => Student[]) => void;
   onChangeTracked: (change: ChangeRecord) => void;
+  onFeedbackSelect?: (feedbackId: number) => void;
+  selectedFeedbackId?: number | null;
 }
 
 export type { FeedbackProps }; 

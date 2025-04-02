@@ -42,6 +42,8 @@ const StudentList: React.FC<{
   feedbackItems: any[];
   setFeedbackItems: React.Dispatch<React.SetStateAction<any[]>>;
   onLastAutoSaveTimeUpdate: (time: string) => void;
+  selectedFeedbackId: number | null;
+  onFeedbackSelect: (feedbackId: number | null) => void;
 }> = ({
   students,
   setStudents,
@@ -54,6 +56,8 @@ const StudentList: React.FC<{
   feedbackItems,
   setFeedbackItems,
   onLastAutoSaveTimeUpdate,
+  selectedFeedbackId,
+  onFeedbackSelect,
 }) => {
   console.log('StudentList received students:', students);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -678,6 +682,7 @@ const StudentList: React.FC<{
                 rows={table.getRowModel().rows}
                 selectedStudent={selectedStudent}
                 onStudentSelect={onStudentSelect}
+                selectedFeedbackId={selectedFeedbackId}
               />
             </Table>
           </div>

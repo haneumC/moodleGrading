@@ -7,13 +7,17 @@ interface TableBodyProps {
   rows: Row<Student>[];
   selectedStudent: string | null;
   onStudentSelect: (studentName: string) => void;
+  selectedFeedbackId: number | null;
 }
 
 const TableBodyComponent: React.FC<TableBodyProps> = ({ 
   rows, 
   selectedStudent, 
-  onStudentSelect 
+  onStudentSelect,
+  selectedFeedbackId
 }) => {
+  console.log('TableBody received selectedFeedbackId:', selectedFeedbackId);
+  
   return (
     <>
       <TableCaption>
@@ -29,19 +33,45 @@ const TableBodyComponent: React.FC<TableBodyProps> = ({
             </TableCell>
           </TableRow>
         ) : (
-          rows.map(row => (
-            <TableRow
-              key={row.id}
-              className={selectedStudent === row.original.name ? 'selected' : ''}
-              onClick={() => onStudentSelect(row.original.name)}
-            >
-              {row.getVisibleCells().map(cell => (
-                <TableCell key={cell.id}>
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))
+          rows.map((row) => {
+            const student = row.original;
+            const isSelected = student.name === selectedStudent;
+            
+            // Debug: Check if student has appliedIds array
+            console.log(`Student ${student.name} appliedIds:`, student.appliedIds);
+            
+            // Make sure appliedIds is an array before checking includes
+            const studentAppliedIds = Array.isArray(student.appliedIds) ? student.appliedIds : [];
+            
+            // Check if this student has the selected feedback applied
+            const hasFeedbackApplied = selectedFeedbackId !== null && 
+              studentAppliedIds.includes(selectedFeedbackId);
+            
+            console.log(`Student ${student.name} has feedback ${selectedFeedbackId} applied:`, hasFeedbackApplied);
+            
+            let rowClassName = 'cursor-pointer ';
+            if (isSelected) {
+              rowClassName += 'selected bg-blue-900 hover:bg-blue-800';
+            } else if (hasFeedbackApplied) {
+              rowClassName += 'bg-green-900 hover:bg-green-800 student-with-feedback'; // Add the CSS class
+            } else {
+              rowClassName += 'hover:bg-gray-800';
+            }
+            
+            return (
+              <TableRow 
+                key={student.name} 
+                className={rowClassName}
+                onClick={() => onStudentSelect(student.name)}
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            );
+          })
         )}
       </TableBody>
     </>

@@ -54,6 +54,8 @@ interface SortableItemProps {
   onDeleteFeedback: (id: number) => void;
   setEditingText: (text: string) => void;
   setEditingDeduction: (value: number) => void;
+  onFeedbackSelect?: (id: number) => void;
+  selectedFeedbackId?: number | null;
 }
 
 const SortableItem = ({
@@ -71,6 +73,8 @@ const SortableItem = ({
   onDeleteFeedback,
   setEditingText,
   setEditingDeduction,
+  onFeedbackSelect,
+  selectedFeedbackId,
 }: SortableItemProps) => {
   const {
     attributes,
@@ -86,6 +90,8 @@ const SortableItem = ({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  const isSelected = selectedFeedbackId === item.id;
 
   return (
     <TableRow ref={setNodeRef} style={style}>
@@ -132,10 +138,19 @@ const SortableItem = ({
           <TableCell>
             <div 
               className={`p-2 rounded border-l-4 transition-colors whitespace-pre-wrap break-words ${
-                appliedIds.includes(item.id)
-                  ? 'bg-[#2d4a3e] border-[#4CAF50] text-[#e1e1e1]'
-                  : 'bg-[#3a3f4b] border-[#5c6bc0] text-[#e1e1e1] hover:bg-[#454b5a]'
+                isSelected 
+                  ? 'bg-[#3a5a3e] border-[#6CAF70] text-[#ffffff] selected-feedback'
+                  : appliedIds.includes(item.id)
+                    ? 'bg-[#2d4a3e] border-[#4CAF50] text-[#e1e1e1]'
+                    : 'bg-[#3a3f4b] border-[#5c6bc0] text-[#e1e1e1] hover:bg-[#454b5a]'
               }`}
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  e.stopPropagation();
+                  console.log('Clicking on feedback div:', item.id);
+                  onFeedbackSelect && onFeedbackSelect(item.id);
+                }
+              }}
             >
               <div {...attributes} {...listeners} className="cursor-move inline-block">
                 <i className="bi bi-grip-vertical mr-2 text-gray-500"></i>
@@ -144,7 +159,14 @@ const SortableItem = ({
                 className="cursor-pointer hover:bg-[#454b5a] p-1 rounded transition-colors inline-block"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onStartEdit(item);
+                  if (e.ctrlKey || e.metaKey) {
+                    // If Ctrl/Cmd key is pressed, start editing
+                    onStartEdit(item);
+                  } else {
+                    // Otherwise, select the feedback
+                    console.log('Clicking on feedback text:', item.id);
+                    onFeedbackSelect && onFeedbackSelect(item.id);
+                  }
                 }}
               >
                 {item.comment}
@@ -209,7 +231,9 @@ const Feedback: React.FC<FeedbackProps> = ({
   feedbackItems,
   setFeedbackItems,
   onStudentsUpdate,
-  onChangeTracked
+  onChangeTracked,
+  onFeedbackSelect,
+  selectedFeedbackId
 }) => {
   const [isAddingFeedback, setIsAddingFeedback] = useState(false);
   const [newFeedback, setNewFeedback] = useState<Omit<FeedbackItem, 'id' | 'applied'>>({ 
@@ -244,16 +268,19 @@ const Feedback: React.FC<FeedbackProps> = ({
         if (student.name === selectedStudent) {
           const oldState = { ...student };
           
-          if (student.appliedIds.includes(feedbackItem.id)) {
+          // Ensure appliedIds is an array
+          const currentAppliedIds = Array.isArray(student.appliedIds) ? student.appliedIds : [];
+          
+          if (currentAppliedIds.includes(feedbackItem.id)) {
             // Remove the feedback
             const feedbackLines = student.feedback
-              .split('\n')
+              .split('\n\n')
               .filter(line => line.trim() !== feedbackItem.comment.trim())
               .filter(line => line.trim() !== '')
               .join('\n\n');
 
             // Calculate new grade
-            const remainingIds = student.appliedIds.filter(id => id !== feedbackItem.id);
+            const remainingIds = currentAppliedIds.filter(id => id !== feedbackItem.id);
             const newState = {
               ...student,
               grade: remainingIds.length === 0 ? "" : (20 - feedbackItem.grade).toString(),
@@ -273,7 +300,7 @@ const Feedback: React.FC<FeedbackProps> = ({
             return newState;
           } else {
             // Apply the feedback
-            const newAppliedIds = [...student.appliedIds, feedbackItem.id];
+            const newAppliedIds = [...currentAppliedIds, feedbackItem.id];
             const newGrade = (20 - feedbackItem.grade).toString();
             const newFeedback = student.feedback
               ? `${student.feedback.trim()}\n\n${feedbackItem.comment.trim()}`
@@ -285,6 +312,9 @@ const Feedback: React.FC<FeedbackProps> = ({
               feedback: newFeedback,
               appliedIds: newAppliedIds,
             };
+
+            // Debug: Log the new state
+            console.log(`Applied feedback ${feedbackItem.id} to student ${student.name}`, newState);
 
             // Track the change
             onChangeTracked({
@@ -426,6 +456,13 @@ const Feedback: React.FC<FeedbackProps> = ({
     }
   };
 
+  const handleFeedbackSelect = (feedbackId: number) => {
+    console.log('Feedback selected:', feedbackId);
+    if (onFeedbackSelect) {
+      onFeedbackSelect(feedbackId);
+    }
+  };
+
   const sortedItems = getSortedFeedbackItems();
 
   return (
@@ -498,6 +535,8 @@ const Feedback: React.FC<FeedbackProps> = ({
                     onDeleteFeedback={handleDeleteFeedback}
                     setEditingText={setEditingText}
                     setEditingDeduction={setEditingDeduction}
+                    onFeedbackSelect={handleFeedbackSelect}
+                    selectedFeedbackId={selectedFeedbackId}
                   />
                 ))}
               </SortableContext>
