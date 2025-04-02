@@ -12,7 +12,6 @@ interface FileControlsProps {
   showAutoSaveStatus: boolean;
   hasData: boolean;
   isSaving: boolean;
-  hasUnsavedChanges: boolean;
   lastAutoSaveTime?: string;
 }
 
@@ -25,8 +24,7 @@ const FileControls: React.FC<FileControlsProps> = ({
   autoSaveStatus,
   showAutoSaveStatus,
   hasData,
-  isSaving,
-  hasUnsavedChanges
+  isSaving
 }) => {
   const handleSaveProgress = async () => {
     console.log('Manual save triggered');

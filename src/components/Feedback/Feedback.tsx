@@ -233,8 +233,7 @@ const Feedback: React.FC<FeedbackProps> = ({
   onStudentsUpdate,
   onChangeTracked,
   onFeedbackSelect,
-  selectedFeedbackId,
-  onSaveProgress
+  selectedFeedbackId
 }) => {
   const [isAddingFeedback, setIsAddingFeedback] = useState(false);
   const [newFeedback, setNewFeedback] = useState<Omit<FeedbackItem, 'id' | 'applied'>>({ 

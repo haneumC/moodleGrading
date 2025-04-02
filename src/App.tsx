@@ -86,10 +86,8 @@ const MainApp = () => {
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(defaultFeedback);
   
   const [changeHistory, setChangeHistory] = useState<ChangeRecord[]>([]);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
   const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
-  const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState<boolean>(false);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<number | null>(null);
 
@@ -260,7 +258,16 @@ const MainApp = () => {
     );
   };
 
-  const saveData = useCallback(async (showStatus: boolean = false, isAuto: boolean = false) => {
+  // First, define handleLastAutoSaveTimeUpdate before saveData
+  const handleLastAutoSaveTimeUpdate = (time: string) => {
+    console.log(`Received last auto-save time in App: ${time}`);
+    setLastAutoSaveTime(time);
+  };
+
+  // Then define saveData which uses handleLastAutoSaveTimeUpdate
+  const saveData = useCallback(async (showStatus: boolean = false, _isAuto: boolean = false) => {
+    console.log(`saveData called with showStatus=${showStatus}, isAuto=${_isAuto}`);
+    
     try {
       const saveData = {
         students,
@@ -269,6 +276,11 @@ const MainApp = () => {
         feedbackItems
       };
       const jsonString = JSON.stringify(saveData, null, 2);
+      console.log('Preparing to save data:', {
+        studentsCount: students.length,
+        feedbackItemsCount: feedbackItems.length,
+        dataSize: jsonString.length
+      });
 
       if (!savedFileHandle) {
         // No file handle exists, prompt user to save a new file
@@ -290,6 +302,10 @@ const MainApp = () => {
             await writable.write(jsonString);
             await writable.close();
             console.log('Data saved to new file');
+            
+            // Update last auto-save time
+            const timeString = new Date().toLocaleTimeString();
+            handleLastAutoSaveTimeUpdate(timeString);
           } catch (err) {
             if (err instanceof Error && err.name === 'AbortError') {
               console.log('Save operation was cancelled by the user.');
@@ -312,10 +328,37 @@ const MainApp = () => {
       } else {
         // File handle exists, save to the existing file
         try {
+          console.log(`Attempting to save to existing file: ${savedFileHandle.name}`);
+          
+          // Check if we have permission to write to the file
+          const permissionStatus = await savedFileHandle.queryPermission({ mode: 'readwrite' });
+          console.log(`File permission status: ${permissionStatus}`);
+          
+          if (permissionStatus !== 'granted') {
+            console.log('Requesting permission to write to file...');
+            const newPermissionStatus = await savedFileHandle.requestPermission({ mode: 'readwrite' });
+            console.log(`New permission status: ${newPermissionStatus}`);
+            
+            if (newPermissionStatus !== 'granted') {
+              console.error('Permission to write to file was denied');
+              return false;
+            }
+          }
+          
+          console.log('Creating writable stream...');
           const writable = await savedFileHandle.createWritable();
+          
+          console.log(`Writing ${jsonString.length} bytes to file...`);
           await writable.write(jsonString);
+          
+          console.log('Closing writable stream...');
           await writable.close();
-          console.log('Data saved to existing file');
+          
+          console.log('✅ File write completed successfully');
+          
+          // Update last auto-save time
+          const timeString = new Date().toLocaleTimeString();
+          handleLastAutoSaveTimeUpdate(timeString);
         } catch (err) {
           console.error('Error saving to existing file:', err);
           // If permission was revoked or file is no longer accessible
@@ -326,17 +369,7 @@ const MainApp = () => {
       }
 
       if (showStatus) {
-        setLastSaved(new Date());
-        
-        if (isAuto) {
-          // Show the auto-save indicator
-          setShowAutoSaveIndicator(true);
-          
-          // Hide it after 3 seconds
-          setTimeout(() => {
-            setShowAutoSaveIndicator(false);
-          }, 3000);
-        }
+        console.log('Data saved successfully');
       }
       
       return true;
@@ -344,27 +377,7 @@ const MainApp = () => {
       console.error('Save error:', err);
       return false;
     }
-  }, [students, feedbackItems, assignmentName, savedFileHandle]);
-
-  // Add auto-save functionality
-  useEffect(() => {
-    if (students.length > 0 && savedFileHandle) {
-      const intervalId = setInterval(() => {
-        saveData(true, true);
-      }, 120000);
-      
-      return () => clearInterval(intervalId);
-    }
-  }, [students, feedbackItems, assignmentName, savedFileHandle, saveData]);
-
-  const handleSaveProgress = async () => {
-    return await saveData(true, false);
-  };
-
-  const handleLastAutoSaveTimeUpdate = (time: string) => {
-    console.log(`Received last auto-save time in App: ${time}`);
-    setLastAutoSaveTime(time);
-  };
+  }, [students, feedbackItems, assignmentName, savedFileHandle, handleLastAutoSaveTimeUpdate]);
 
   // Function to handle feedback selection
   const handleFeedbackSelect = (feedbackId: number | null) => {
@@ -451,7 +464,6 @@ const MainApp = () => {
             onChangeTracked={handleChangeTracked}
             onFeedbackSelect={handleFeedbackSelect}
             selectedFeedbackId={selectedFeedbackId}
-            onSaveProgress={handleSaveProgress}
           />
         </div>
         <div className="right">
@@ -465,10 +477,9 @@ const MainApp = () => {
             feedbackItems={feedbackItems}
             setFeedbackItems={setFeedbackItems}
             onChangeTracked={handleChangeTracked}
-            onSaveProgress={handleSaveProgress}
             onLastAutoSaveTimeUpdate={handleLastAutoSaveTimeUpdate}
             selectedFeedbackId={selectedFeedbackId}
-            onFeedbackSelect={handleFeedbackSelect}
+            onSaveData={saveData}
           />
         </div>
       </main>

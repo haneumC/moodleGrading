@@ -16,6 +16,19 @@ import './StudentList.css';
 import { getImportedMoodleData } from '@/utils/moodleDataImport';
 import AutoSaveDebugPanel from './components/AutoSaveDebugPanel';
 
+// Add these type declarations at the top of the file
+interface FileSystemPermissionDescriptor {
+  mode?: 'read' | 'readwrite';
+}
+
+// Extend the FileSystemFileHandle interface
+declare global {
+  interface FileSystemFileHandle {
+    queryPermission(descriptor: FileSystemPermissionDescriptor): Promise<PermissionState>;
+    requestPermission(descriptor: FileSystemPermissionDescriptor): Promise<PermissionState>;
+  }
+}
+
 // Add type declaration for FileSystemFileHandle
 declare global {
   interface Window {
@@ -38,12 +51,11 @@ const StudentList: React.FC<{
   assignmentName: string;
   setAssignmentName: React.Dispatch<React.SetStateAction<string>>;
   onChangeTracked: (change: ChangeRecord) => void;
-  onSaveProgress?: () => Promise<boolean>;
   feedbackItems: any[];
   setFeedbackItems: React.Dispatch<React.SetStateAction<any[]>>;
   onLastAutoSaveTimeUpdate: (time: string) => void;
   selectedFeedbackId: number | null;
-  onFeedbackSelect: (feedbackId: number | null) => void;
+  onSaveData: (showStatus: boolean, isAuto: boolean) => Promise<boolean>;
 }> = ({
   students,
   setStudents,
@@ -52,12 +64,11 @@ const StudentList: React.FC<{
   assignmentName,
   setAssignmentName,
   onChangeTracked,
-  onSaveProgress,
   feedbackItems,
   setFeedbackItems,
   onLastAutoSaveTimeUpdate,
   selectedFeedbackId,
-  onFeedbackSelect,
+  onSaveData
 }) => {
   console.log('StudentList received students:', students);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -70,7 +81,6 @@ const StudentList: React.FC<{
   const lastSaveTimeRef = useRef<number>(Date.now());
   const hasUnsavedChangesRef = useRef<boolean>(false);
   const lastSavedDataRef = useRef<string>('');
-  const autoSaveIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { handleFileChange, exportForMoodle } = useCSVHandling(
     setStudents, 
@@ -81,7 +91,7 @@ const StudentList: React.FC<{
 
   // Add these new state variables
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
-  const [saveHistory, setSaveHistory] = useState<Array<{
+  const [saveHistory] = useState<Array<{
     timestamp: number;
     success: boolean;
     dataSize: number;
@@ -139,10 +149,10 @@ const StudentList: React.FC<{
   // Modify the track changes useEffect to not show indicators
   useEffect(() => {
     if (students.length > 0 || feedbackItems.length > 0) {
-      const currentData = JSON.stringify({ students, feedbackItems });
+      const _currentData = { students, feedbackItems };
       
       // Only mark as having unsaved changes if the data is different from last saved data
-      if (currentData !== lastSavedDataRef.current) {
+      if (JSON.stringify(_currentData) !== lastSavedDataRef.current) {
         hasUnsavedChangesRef.current = true;
         
         // We're removing the indicator here - just silently track changes
@@ -151,7 +161,7 @@ const StudentList: React.FC<{
     }
   }, [students, feedbackItems]);
 
-  // Update the auto-save interval effect to be more reliable
+  // Modify the auto-save interval to use onSaveData
   useEffect(() => {
     console.log('Setting up auto-save interval');
     
@@ -161,165 +171,67 @@ const StudentList: React.FC<{
       
       console.log('Auto-save check running with conditions:');
       console.log(`- Has data: ${students.length > 0 || feedbackItems.length > 0}`);
-      console.log(`- Has file handle: ${!!fileHandle}`);
       console.log(`- Has unsaved changes: ${hasUnsavedChangesRef.current}`);
       console.log(`- Time since last save: ${(now - lastSaveTimeRef.current) / 1000}s`);
       
-      // Only run auto-save if we have data and a file handle
-      if ((students.length > 0 || feedbackItems.length > 0) && fileHandle) {
+      // Only run auto-save if we have data
+      if (students.length > 0 || feedbackItems.length > 0) {
         // Check if it's been at least 1 minute since the last save
         if (now - lastSaveTimeRef.current >= 60000) {
           console.log('🔄 Auto-save triggered!');
           
-          // Even if there are no changes, we'll still show the auto-save notification
-          // This ensures the user sees auto-save happening every 1 minute
+          // Show saving indicator
           setIsSaving(true);
           
-          // Use the existing save function
-          handleSaveProgress(true)
-            .then(async (success) => {
+          // Use the saveData function from App.tsx
+          onSaveData(true, true)
+            .then(success => {
               if (success) {
-                // Verify the file was actually written correctly
-                if (fileHandle) {
-                  try {
-                    // Read the file back to verify its contents
-                    const file = await fileHandle.getFile();
-                    const contents = await file.text();
-                    const savedData = JSON.parse(contents);
-                    
-                    // Check if the file contains the expected data
-                    const currentData = { students, feedbackItems };
-                    const savedStudentsCount = savedData.students?.length || 0;
-                    const currentStudentsCount = students.length;
-                    
-                    console.log(`File verification: Found ${savedStudentsCount} students in file, expected ${currentStudentsCount}`);
-                    
-                    if (savedStudentsCount !== currentStudentsCount) {
-                      console.error('❌ File verification failed: Student count mismatch');
-                      // Try to save again
-                      console.log('Attempting to save again...');
-                      await handleSaveProgress(true);
-                      return;
-                    }
-                    
-                    // If we get here, the file was written correctly
-                    console.log('✅ File verification passed: File contains correct data');
-                    
-                    // Update last save time
-                    lastSaveTimeRef.current = now;
-                    
-                    // Update last saved data
-                    lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
-                    
-                    // Reset unsaved changes flag
-                    hasUnsavedChangesRef.current = false;
-                    
-                    // Format current time for display
-                    const timeString = new Date().toLocaleTimeString();
-                    setLastAutoSaveTime(timeString);
-                    console.log(`Setting last auto-save time to: ${timeString}`);
-                    
-                    // Pass the timestamp up to the parent component
-                    onLastAutoSaveTimeUpdate(timeString);
-                    console.log(`Passed last auto-save time to parent: ${timeString}`);
-                    
-                    // Always show auto-save status message
-                    setAutoSaveStatus(`Auto-saved at ${timeString}`);
-                    setShowAutoSaveStatus(true);
-                    
-                    // Make the message visible for longer (7 seconds)
-                    setTimeout(() => {
-                      setShowAutoSaveStatus(false);
-                    }, 7000);
-                    
-                    // Reset saving state
-                    setIsSaving(false);
-                    
-                    console.log('✅ Auto-save completed successfully');
-                  } catch (error) {
-                    console.error('❌ File verification failed:', error);
-                    setIsSaving(false);
-                    
-                    // Show error message
-                    setAutoSaveStatus('Auto-save verification failed. Will try again soon.');
-                    setShowAutoSaveStatus(true);
-                    
-                    // Hide the error message after 5 seconds
-                    setTimeout(() => {
-                      setShowAutoSaveStatus(false);
-                    }, 5000);
-                  }
-                } else {
-                  // No file handle, but save reported success (download case)
-                  // Update last save time
-                  lastSaveTimeRef.current = now;
-                  
-                  // Update last saved data
-                  lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
-                  
-                  // Reset unsaved changes flag
-                  hasUnsavedChangesRef.current = false;
-                  
-                  // Format current time for display
-                  const timeString = new Date().toLocaleTimeString();
-                  setLastAutoSaveTime(timeString);
-                  
-                  // Pass the timestamp up to the parent component
-                  onLastAutoSaveTimeUpdate(timeString);
-                  
-                  // Always show auto-save status message
-                  setAutoSaveStatus(`Auto-saved at ${timeString}`);
-                  setShowAutoSaveStatus(true);
-                  
-                  // Make the message visible for longer (7 seconds)
-                  setTimeout(() => {
-                    setShowAutoSaveStatus(false);
-                  }, 7000);
-                  
-                  // Reset saving state
-                  setIsSaving(false);
-                  
-                  console.log('✅ Auto-save completed successfully (download mode)');
-                }
-              } else {
-                // Save reported failure
-                setIsSaving(false);
-                console.error('❌ Auto-save failed: Save function returned false');
+                console.log('✅ Auto-save completed successfully');
                 
-                // Show error message
-                setAutoSaveStatus('Auto-save failed. Will try again soon.');
+                // Update last save time
+                lastSaveTimeRef.current = Date.now();
+                
+                // Update last saved data
+                lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
+                
+                // Reset unsaved changes flag
+                hasUnsavedChangesRef.current = false;
+                
+                // Format current time for display
+                const timeString = new Date().toLocaleTimeString();
+                setLastAutoSaveTime(timeString);
+                
+                // Show auto-save status message
+                setAutoSaveStatus(`Auto-saved at ${timeString}`);
                 setShowAutoSaveStatus(true);
                 
-                // Hide the error message after 5 seconds
+                // Hide the message after a few seconds
                 setTimeout(() => {
                   setShowAutoSaveStatus(false);
-                }, 5000);
+                }, 3000);
+              } else {
+                console.error('❌ Auto-save failed');
               }
+              
+              // Reset saving state
+              setIsSaving(false);
             })
             .catch(error => {
-              setIsSaving(false);
               console.error('❌ Auto-save failed:', error);
-              
-              // Show error message
-              setAutoSaveStatus('Auto-save failed. Will try again soon.');
-              setShowAutoSaveStatus(true);
-              
-              // Hide the error message after 5 seconds
-              setTimeout(() => {
-                setShowAutoSaveStatus(false);
-              }, 5000);
+              setIsSaving(false);
             });
         } else {
           console.log(`⏳ Next auto-save in ${((60000 - (now - lastSaveTimeRef.current)) / 1000).toFixed(0)} seconds`);
         }
       } else {
-        console.log('❌ Auto-save conditions not met (missing data or file handle)');
+        console.log('❌ Auto-save conditions not met (no data)');
       }
-    }, 60000); // 👈 Changed from 120000 to 60000 (1 minute)
+    }, 1000); // Check every second, but only save every minute
     
     // Clean up the interval when component unmounts
     return () => clearInterval(intervalId);
-  }, [fileHandle]); // Only re-create the interval when the file handle changes
+  }, [students, feedbackItems, onSaveData]); // Re-create the interval when these dependencies change
 
   // Check if File System Access API is supported
   useEffect(() => {
@@ -377,332 +289,34 @@ const StudentList: React.FC<{
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Handle saving progress to localStorage
+  // Modify the handleSaveProgress function to use onSaveData
   const handleSaveProgress = async (autoSave = false): Promise<boolean> => {
     console.log('handleSaveProgress called with autoSave =', autoSave);
     setIsSaving(true);
     
     try {
-      // Check if we have any data to save
-      if (students.length === 0) {
-        console.error('No students to save');
-        setError('No data to save. Please import students first.');
-        setIsSaving(false);
-        return false;
+      const result = await onSaveData(true, autoSave);
+      
+      if (result) {
+        // Update last save time
+        lastSaveTimeRef.current = Date.now();
+        
+        // Update last saved data
+        lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
+        
+        // Reset unsaved changes flag
+        hasUnsavedChangesRef.current = false;
+        
+        // Format current time for display
+        const timeString = new Date().toLocaleTimeString();
+        setLastAutoSaveTime(timeString);
       }
       
-      const data = {
-        students,
-        assignmentName,
-        timestamp: new Date().toISOString(),
-        feedbackItems
-      };
-      
-      console.log('Data prepared for saving:', {
-        studentsCount: students.length,
-        assignmentName,
-        feedbackItemsCount: feedbackItems.length
-      });
-      
-      const jsonData = JSON.stringify(data, null, 2);
-      console.log(`JSON data size: ${jsonData.length} bytes`);
-      
-      // If we already have a file handle, use it
-      if (fileHandle) {
-        try {
-          console.log(`Saving to existing file: ${fileHandle.name}`);
-          
-          // Check if we have permission to write to the file
-          const permissionStatus = await fileHandle.queryPermission({ mode: 'readwrite' });
-          if (permissionStatus !== 'granted') {
-            console.log('Requesting permission to write to file...');
-            const newPermissionStatus = await fileHandle.requestPermission({ mode: 'readwrite' });
-            if (newPermissionStatus !== 'granted') {
-              throw new Error('Permission to write to file was denied');
-            }
-          }
-          
-          // Create a writable stream
-          const writable = await fileHandle.createWritable();
-          
-          // Write the data
-          await writable.write(jsonData);
-          
-          // Close the stream
-          await writable.close();
-          
-          console.log('✅ File write completed');
-          
-          // Update last save time
-          lastSaveTimeRef.current = Date.now();
-          
-          // Update last saved data
-          lastSavedDataRef.current = jsonData;
-          
-          // Reset unsaved changes flag
-          hasUnsavedChangesRef.current = false;
-          
-          // Format current time for display
-          const timeString = new Date().toLocaleTimeString();
-          setLastAutoSaveTime(timeString);
-          
-          // Pass the timestamp up to the parent component
-          onLastAutoSaveTimeUpdate(timeString);
-          
-          // Only show status message if it's not an auto-save
-          if (!autoSave) {
-            setAutoSaveStatus(`Saved at ${timeString}`);
-            setShowAutoSaveStatus(true);
-            setTimeout(() => {
-              setShowAutoSaveStatus(false);
-            }, 3000);
-          }
-          
-          // Set isSaving back to false
-          setIsSaving(false);
-          return true;
-        } catch (error) {
-          console.error('Error saving to file:', error);
-          
-          // If this was triggered by auto-save, don't show a download dialog
-          if (autoSave) {
-            setIsSaving(false);
-            return false;
-          }
-          
-          // For manual saves, fall back to download method
-          try {
-            console.log('Falling back to download method');
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            setAutoSaveStatus('File saved as download (auto-save disabled)');
-            setShowAutoSaveStatus(true);
-            setTimeout(() => {
-              setShowAutoSaveStatus(false);
-            }, 5000);
-            
-            // Reset file handle since we couldn't write to it
-            setFileHandle(null);
-            localStorage.removeItem('lastSaveFileName');
-            
-            // Set isSaving back to false
-            setIsSaving(false);
-            return true;
-          } catch (fallbackError) {
-            console.error('Fallback save method failed:', fallbackError);
-            setError('Failed to save progress. Please try again.');
-            setIsSaving(false);
-            return false;
-          }
-        }
-      } else if ('showSaveFilePicker' in window && !autoSave) {
-        // Only show the file picker for manual saves, not auto-saves
-        try {
-          // No file handle yet, prompt user to create a file
-          const options = {
-            suggestedName: `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`,
-            types: [
-              {
-                description: 'JSON Files',
-                accept: { 'application/json': ['.json'] }
-              }
-            ]
-          };
-          
-          console.log('Showing save file picker...');
-          const newFileHandle = await window.showSaveFilePicker(options);
-          console.log('User selected file:', newFileHandle.name);
-          
-          setFileHandle(newFileHandle);
-          localStorage.setItem('lastSaveFileName', newFileHandle.name);
-          
-          console.log('Creating writable stream...');
-          const writable = await newFileHandle.createWritable();
-          
-          console.log('Writing data to file...');
-          await writable.write(jsonData);
-          
-          console.log('Closing writable stream...');
-          await writable.close();
-          
-          console.log('Data saved to new file');
-          
-          // Show a special message for first save
-          setAutoSaveStatus('Progress saved successfully. Auto-save is now enabled.');
-          setShowAutoSaveStatus(true);
-          setTimeout(() => {
-            setShowAutoSaveStatus(false);
-          }, 5000);
-          
-          // Update last save time
-          lastSaveTimeRef.current = Date.now();
-          
-          // Update last saved data
-          lastSavedDataRef.current = jsonData;
-          
-          // Reset unsaved changes flag
-          hasUnsavedChangesRef.current = false;
-          
-          // Format current time for display
-          const timeString = new Date().toLocaleTimeString();
-          setLastAutoSaveTime(timeString);
-          
-          // Pass the timestamp up to the parent component
-          onLastAutoSaveTimeUpdate(timeString);
-          
-          // Set isSaving back to false
-          setIsSaving(false);
-          return true;
-        } catch (error) {
-          console.error('Save operation failed:', error);
-          
-          // Check if it's an AbortError (user canceled)
-          if (error.name === 'AbortError') {
-            console.log('Save operation was canceled by the user');
-            setIsSaving(false);
-            return false;
-          }
-          
-          // For manual saves, fall back to download method
-          try {
-            console.log('Falling back to download method');
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            setAutoSaveStatus('File saved as download (auto-save disabled)');
-            setShowAutoSaveStatus(true);
-            setTimeout(() => {
-              setShowAutoSaveStatus(false);
-            }, 5000);
-            
-            // Set isSaving back to false
-            setIsSaving(false);
-            return true;
-          } catch (fallbackError) {
-            console.error('Fallback save method failed:', fallbackError);
-            setError('Failed to save progress. Please try again.');
-            setIsSaving(false);
-            return false;
-          }
-        }
-      } else {
-        // This is either an auto-save without a file handle, or a browser without File System Access API
-        
-        // For auto-saves without a file handle, just silently return
-        if (autoSave) {
-          console.log('Auto-save skipped - no file handle available');
-          setIsSaving(false);
-          return false;
-        }
-        
-        // For manual saves in browsers without File System Access API, use download method
-        try {
-          console.log('Using download method for browsers without File System Access API');
-          const blob = new Blob([jsonData], { type: 'application/json' });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
-          
-          setAutoSaveStatus('Progress saved as download');
-          setShowAutoSaveStatus(true);
-          setTimeout(() => {
-            setShowAutoSaveStatus(false);
-          }, 3000);
-          
-          // Update last save time
-          lastSaveTimeRef.current = Date.now();
-          
-          // Update last saved data
-          lastSavedDataRef.current = jsonData;
-          
-          // Reset unsaved changes flag
-          hasUnsavedChangesRef.current = false;
-          
-          // Format current time for display
-          const timeString = new Date().toLocaleTimeString();
-          setLastAutoSaveTime(timeString);
-          
-          // Pass the timestamp up to the parent component
-          onLastAutoSaveTimeUpdate(timeString);
-          
-          // Set isSaving back to false
-          setIsSaving(false);
-          return true;
-        } catch (error) {
-          console.error('Error saving progress:', error);
-          setError('Failed to save progress. Please try again.');
-          setIsSaving(false);
-          return false;
-        }
-      }
-    } catch (error) {
       setIsSaving(false);
-      console.error('Error preparing data for save:', error);
-      setError('Failed to prepare data for saving. Please try again.');
-      return false;
-    }
-  };
-
-  // Enhanced file verification function
-  const verifyFileContents = async (fileHandle: FileSystemFileHandle, expectedStudentCount: number): Promise<boolean> => {
-    try {
-      const file = await fileHandle.getFile();
-      const contents = await file.text();
-      
-      try {
-        const data = JSON.parse(contents);
-        console.log('File verification: File contains valid JSON data.');
-        
-        if (!data.students || !Array.isArray(data.students)) {
-          console.error('File verification failed: No students array in file');
-          return false;
-        }
-        
-        console.log(`File contains data for ${data.students.length} students, expected ${expectedStudentCount}`);
-        
-        if (data.students.length !== expectedStudentCount) {
-          console.error('File verification failed: Student count mismatch');
-          return false;
-        }
-        
-        // Check if the grades in the file match the current grades
-        const currentStudentData = JSON.stringify(students);
-        const savedStudentData = JSON.stringify(data.students);
-        
-        if (currentStudentData !== savedStudentData) {
-          console.error('File verification failed: Student data mismatch');
-          console.log('Current student data:', students);
-          console.log('Saved student data:', data.students);
-          return false;
-        }
-        
-        return true;
-      } catch (error) {
-        console.error('File verification failed: Invalid JSON in file', error);
-        return false;
-      }
+      return result;
     } catch (error) {
-      console.error('File verification failed: Could not read file', error);
+      console.error('Error in handleSaveProgress:', error);
+      setIsSaving(false);
       return false;
     }
   };
@@ -764,7 +378,6 @@ const StudentList: React.FC<{
           showAutoSaveStatus={showAutoSaveStatus}
           hasData={students.length > 0}
           isSaving={isSaving}
-          hasUnsavedChanges={hasUnsavedChangesRef.current}
           lastAutoSaveTime={lastAutoSaveTime}
         />
         <div className="rounded-md border">
