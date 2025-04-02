@@ -123,3 +123,19 @@
     transition: transform 0.2s;
   }
   
+  .drag-ghost {
+    position: absolute;
+    top: -1000px;
+    background-color: #3a3f4b;
+    border-left: 4px solid #5c6bc0;
+    color: #e1e1e1;
+    padding: 8px;
+    border-radius: 4px;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+  }
+  

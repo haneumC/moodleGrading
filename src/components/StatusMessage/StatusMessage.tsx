@@ -12,12 +12,16 @@ const StatusMessage: React.FC<StatusMessageProps> = ({
   type = 'success',
   icon = '💾'
 }) => {
+  const isAutoSaveMessage = message.includes('Auto-saved');
+  
   if (!message) return null;
 
   return (
-    <div className={`status-bar ${type}`}>
+    <div 
+      className={`status-bar ${type} ${isAutoSaveMessage ? 'auto-save-message' : ''}`}
+    >
       <span className="status-icon">{icon}</span>
-      {message}
+      <span className="status-text">{message}</span>
     </div>
   );
 };

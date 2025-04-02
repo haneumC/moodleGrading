@@ -10,6 +10,8 @@ interface FileControlsProps {
   autoSaveStatus: string;
   showAutoSaveStatus: boolean;
   hasData: boolean;
+  isSaving: boolean;
+  hasUnsavedChanges: boolean;
 }
 
 const FileControls: React.FC<FileControlsProps> = ({ 
@@ -20,56 +22,84 @@ const FileControls: React.FC<FileControlsProps> = ({
   error,
   autoSaveStatus,
   showAutoSaveStatus,
-  hasData
+  hasData,
+  isSaving,
+  hasUnsavedChanges
 }) => {
   const handleSaveProgress = async () => {
-    // Save to localStorage instead of prompting for a file
-    await onSaveProgress();
+    console.log('Manual save triggered');
+    
+    // Show a saving indicator
+    const result = await onSaveProgress();
+    
+    console.log(`Manual save completed with result: ${result ? 'SUCCESS' : 'FAILED'}`);
+    
+    // If save failed, show an error
+    if (!result) {
+      alert('Save failed. Check the console for details.');
+    } else {
+      // If save succeeded, verify the file was updated
+      console.log('Verifying file was updated...');
+      // Additional verification could be added here
+    }
   };
 
   return (
     <>
-      <div className="buttons">
-        <form>
-          <label htmlFor="csvFileInput" className="import-file-label">
-            Import File (exported from Moodle)
+      <div className="controls-container">
+        <div className="buttons">
+          <form>
+            <label htmlFor="csvFileInput" className="import-file-label">
+              Import File (exported from Moodle)
+            </label>
+            <input
+              type="file"
+              id="csvFileInput"
+              accept=".csv"
+              onChange={onFileImport}
+              className="import-file-input"
+            />
+          </form>
+          <button 
+            className="studentBtn" 
+            onClick={onExport}
+            disabled={!hasData}
+            style={{ opacity: hasData ? 1 : 0.5, cursor: hasData ? 'pointer' : 'not-allowed' }}
+          >
+            Export for Moodle
+          </button>
+          <button 
+            className="studentBtn" 
+            onClick={handleSaveProgress}
+            disabled={!hasData || isSaving}
+            style={{ 
+              opacity: hasData && !isSaving ? 1 : 0.5, 
+              cursor: hasData && !isSaving ? 'pointer' : 'not-allowed',
+              position: 'relative'
+            }}
+          >
+            {isSaving ? (
+              <>
+                <span className="saving-spinner"></span>
+                Saving...
+              </>
+            ) : (
+              'Save Progress'
+            )}
+          </button>
+          <label className="studentBtn" style={{ cursor: 'pointer' }}>
+            Load Progress
+            <input
+              type="file"
+              accept=".json"
+              onChange={onLoadProgress}
+              style={{ display: 'none' }}
+            />
           </label>
-          <input
-            type="file"
-            id="csvFileInput"
-            accept=".csv"
-            onChange={onFileImport}
-            className="import-file-input"
-          />
-        </form>
-        <button 
-          className="studentBtn" 
-          onClick={onExport}
-          disabled={!hasData}
-          style={{ opacity: hasData ? 1 : 0.5, cursor: hasData ? 'pointer' : 'not-allowed' }}
-        >
-          Export for Moodle
-        </button>
-        <button 
-          className="studentBtn" 
-          onClick={handleSaveProgress}
-          disabled={!hasData}
-          style={{ opacity: hasData ? 1 : 0.5, cursor: hasData ? 'pointer' : 'not-allowed' }}
-        >
-          Save Progress
-        </button>
-        <label className="studentBtn" style={{ cursor: 'pointer' }}>
-          Load Progress
-          <input
-            type="file"
-            accept=".json"
-            onChange={onLoadProgress}
-            style={{ display: 'none' }}
-          />
-        </label>
+        </div>
       </div>
       
-      {/* Keep the new StatusMessage component for messages */}
+      {/* Keep the status messages */}
       {error && (
         <StatusMessage 
           message={error} 

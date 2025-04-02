@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -39,6 +39,68 @@ const Feedback: React.FC<FeedbackProps> = ({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [reusableIds, setReusableIds] = useState<number[]>([]);
   const [nextId, setNextId] = useState<number>(5);
+  
+  // For drag and drop
+  const [draggedItem, setDraggedItem] = useState<FeedbackItem | null>(null);
+  const [draggedOverItemId, setDraggedOverItemId] = useState<number | null>(null);
+
+  // Add a new state to track whether we're using manual ordering or sorting
+  const [useManualOrder, setUseManualOrder] = useState(false);
+
+  // Handle functions for drag and drop
+  const handleDragStart = (e: React.DragEvent, item: FeedbackItem) => {
+    setDraggedItem(item);
+    e.dataTransfer.effectAllowed = 'move';
+    // Add a ghost image
+    const ghostElement = document.createElement('div');
+    ghostElement.classList.add('drag-ghost');
+    ghostElement.textContent = item.comment;
+    document.body.appendChild(ghostElement);
+    e.dataTransfer.setDragImage(ghostElement, 20, 20);
+    setTimeout(() => {
+      document.body.removeChild(ghostElement);
+    }, 0);
+  };
+
+  const handleDragOver = (e: React.DragEvent, itemId: number) => {
+    e.preventDefault();
+    if (draggedItem && draggedItem.id !== itemId) {
+      setDraggedOverItemId(itemId);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDraggedOverItemId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: number) => {
+    e.preventDefault();
+    
+    if (!draggedItem || draggedItem.id === targetId) {
+      return;
+    }
+    
+    // Switch to manual ordering mode
+    setUseManualOrder(true);
+    
+    // Reorder the items
+    const items = [...feedbackItems];
+    const draggedItemIndex = items.findIndex(item => item.id === draggedItem.id);
+    const targetIndex = items.findIndex(item => item.id === targetId);
+    
+    if (draggedItemIndex !== -1 && targetIndex !== -1) {
+      // Remove the dragged item
+      const [removed] = items.splice(draggedItemIndex, 1);
+      // Insert it at the target position
+      items.splice(targetIndex, 0, removed);
+      
+      setFeedbackItems(items);
+    }
+    
+    setDraggedItem(null);
+    setDraggedOverItemId(null);
+  };
 
   const handleApplyFeedback = (feedbackItem: FeedbackItem) => {
     if (!selectedStudent) return;
@@ -174,6 +236,12 @@ const Feedback: React.FC<FeedbackProps> = ({
   };
 
   const getSortedFeedbackItems = () => {
+    // If we're using manual ordering, just return the items as they are
+    if (useManualOrder) {
+      return feedbackItems;
+    }
+    
+    // Otherwise, sort them as before
     return [...feedbackItems].sort((a, b) => {
       if (sortField === 'text') {
         const commentA = a.comment || '';
@@ -187,14 +255,19 @@ const Feedback: React.FC<FeedbackProps> = ({
           ? a.grade - b.grade
           : b.grade - a.grade;
       }
-      // sorting for applied field
+      // sorting for applied field - ensure we're using the correct property
+      const aApplied = appliedIds.includes(a.id) ? 1 : 0;
+      const bApplied = appliedIds.includes(b.id) ? 1 : 0;
       return sortDirection === 'asc' 
-        ? Number(a.applied || false) - Number(b.applied || false)
-        : Number(b.applied || false) - Number(a.applied || false);
+        ? aApplied - bApplied
+        : bApplied - aApplied;
     });
   };
 
   const handleSort = (field: SortField) => {
+    // Switch to sorting mode
+    setUseManualOrder(false);
+    
     if (sortField === field) {
       setSortDirection(current => current === 'asc' ? 'desc' : 'asc');
     } else {
@@ -202,6 +275,8 @@ const Feedback: React.FC<FeedbackProps> = ({
       setSortDirection('asc');
     }
   };
+
+  const sortedItems = getSortedFeedbackItems();
 
   return (
     <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-380px)] flex flex-col mt-5">
@@ -246,8 +321,22 @@ const Feedback: React.FC<FeedbackProps> = ({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {getSortedFeedbackItems().map((item) => (
-              <TableRow key={item.id} className="border-b border-[#333] hover:bg-[#2d2d2d]">
+            {sortedItems.map((item) => (
+              <TableRow 
+                key={item.id} 
+                className={`border-b border-[#333] ${
+                  draggedOverItemId === item.id 
+                    ? 'bg-[#3a3a3a] border-t-2 border-blue-500' 
+                    : 'hover:bg-[#2d2d2d]'
+                } ${
+                  draggedItem?.id === item.id ? 'opacity-50' : ''
+                }`}
+                draggable={editingId !== item.id}
+                onDragStart={(e) => handleDragStart(e, item)}
+                onDragOver={(e) => handleDragOver(e, item.id)}
+                onDragEnd={handleDragEnd}
+                onDrop={(e) => handleDrop(e, item.id)}
+              >
                 {editingId === item.id ? (
                   <>
                     <TableCell>
@@ -292,14 +381,19 @@ const Feedback: React.FC<FeedbackProps> = ({
                       className="cursor-pointer"
                       onClick={() => handleStartEdit(item)}
                     >
-                      <div 
-                        className={`p-2 rounded border-l-4 transition-colors whitespace-pre-wrap break-words ${
-                          appliedIds.includes(item.id)
-                            ? 'bg-[#2d4a3e] border-[#4CAF50] text-[#e1e1e1]'  // Highlighted state
-                            : 'bg-[#3a3f4b] border-[#5c6bc0] text-[#e1e1e1] hover:bg-[#454b5a]'  // Normal state
-                        }`}
-                      >
-                        {item.comment}
+                      <div className="flex items-center">
+                        <div className="mr-2 text-gray-400 cursor-grab">
+                          <i className="bi bi-grip-vertical"></i>
+                        </div>
+                        <div 
+                          className={`p-2 rounded border-l-4 transition-colors whitespace-pre-wrap break-words flex-1 ${
+                            appliedIds.includes(item.id)
+                              ? 'bg-[#2d4a3e] border-[#4CAF50] text-[#e1e1e1]'  // Highlighted state
+                              : 'bg-[#3a3f4b] border-[#5c6bc0] text-[#e1e1e1] hover:bg-[#454b5a]'  // Normal state
+                          }`}
+                        >
+                          {item.comment}
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell 

@@ -20,4 +20,20 @@
 
 .status-icon {
   font-size: 16px;
+}
+
+.auto-save-message {
+  background-color: rgba(0, 128, 0, 0.15);
+  border-left: 4px solid #4CAF50;
+  padding: 10px 15px;
+  animation: fadeInOut 7s ease-in-out;
+  font-weight: 500;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translateY(-10px); }
+  10% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-10px); }
 } 

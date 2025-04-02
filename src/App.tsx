@@ -90,6 +90,7 @@ const MainApp = () => {
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
   const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [showAutoSaveIndicator, setShowAutoSaveIndicator] = useState<boolean>(false);
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
 
   useEffect(() => {
     // Check chrome.storage.local for data
@@ -344,12 +345,12 @@ const MainApp = () => {
     }
   }, [students, feedbackItems, assignmentName, savedFileHandle]);
 
-  // Add auto-save functionality every 30 seconds
+  // Add auto-save functionality
   useEffect(() => {
     if (students.length > 0 && savedFileHandle) {
       const intervalId = setInterval(() => {
         saveData(true, true);
-      }, 30000);
+      }, 120000);
       
       return () => clearInterval(intervalId);
     }
@@ -357,6 +358,11 @@ const MainApp = () => {
 
   const handleSaveProgress = async () => {
     return await saveData(true, false);
+  };
+
+  const handleLastAutoSaveTimeUpdate = (time: string) => {
+    console.log(`Received last auto-save time in App: ${time}`);
+    setLastAutoSaveTime(time);
   };
 
   return (
@@ -368,30 +374,24 @@ const MainApp = () => {
         About Us
       </button>
 
-      <button 
-        onClick={() => setIsChangeHistoryVisible(!isChangeHistoryVisible)}
-        className="absolute top-16 right-4 text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-between"
-      >
-        <span>{isChangeHistoryVisible ? 'Hide Changes' : 'Show Changes'}</span>
-        <span className="bg-gray-700 px-2 py-0.5 rounded-full text-sm">
-          {changeHistory.length}
-        </span>
-      </button>
-
-      {/* Auto-save indicator with animation */}
-      {showAutoSaveIndicator && (
-        <div className="absolute top-28 right-4 text-sm text-green-400 flex items-center transition-opacity duration-300">
-          <span>Auto-saved</span>
-          <span className="ml-2 text-green-500 text-lg">✓</span>
-        </div>
-      )}
-
-      {/* Regular last saved indicator */}
-      {lastSaved && !showAutoSaveIndicator && (
-        <div className="absolute top-28 right-4 text-sm text-gray-300">
-          <span>Last saved: {lastSaved.toLocaleTimeString()}</span>
-        </div>
-      )}
+      <div className="changes-section absolute top-16 right-4">
+        <button 
+          onClick={() => setIsChangeHistoryVisible(!isChangeHistoryVisible)}
+          className="text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-between"
+        >
+          <span>{isChangeHistoryVisible ? 'Hide Changes' : 'Show Changes'}</span>
+          <span className="bg-gray-700 px-2 py-0.5 rounded-full text-sm">
+            {changeHistory.length}
+          </span>
+        </button>
+        
+        {/* Display the last auto-save time below the Show Changes button */}
+        {lastAutoSaveTime && (
+          <div className="last-autosave-header">
+            Last auto-save: {lastAutoSaveTime}
+          </div>
+        )}
+      </div>
 
       {/* Change History Panel */}
       {isChangeHistoryVisible && (
@@ -440,6 +440,7 @@ const MainApp = () => {
             setFeedbackItems={setFeedbackItems}
             onChangeTracked={handleChangeTracked}
             onSaveProgress={handleSaveProgress}
+            onLastAutoSaveTimeUpdate={handleLastAutoSaveTimeUpdate}
           />
         </div>
       </main>

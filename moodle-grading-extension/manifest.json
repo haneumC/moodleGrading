@@ -3,23 +3,31 @@
   "description": "Launch enhanced grading interface for Moodle assignments",
   "version": "1.0",
   "manifest_version": 3,
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "moodle-grading-assistant@example.com",
+      "strict_min_version": "109.0"
+    }
+  },
   "icons": {
-    "16": "./images/icon-16.png",
-    "32": "./images/icon-32.png",
-    "48": "./images/icon-48.png",
-    "128": "./images/icon-128.png"
+    "16": "images/icon-16.png",
+    "32": "images/icon-32.png",
+    "48": "images/icon-48.png",
+    "128": "images/icon-128.png"
   },
   "content_scripts": [
     {
       "js": ["scripts/content.js"],
       "matches": [
         "https://moodle.calvin.edu/mod/assign/view.php?*",
-        "https://*.moodle.calvin.edu/mod/assign/view.php?*"
+        "https://*.moodle.calvin.edu/mod/assign/view.php?*",
+        "file:///*"
       ]
     }
   ],
   "permissions": [
-    "storage"
+    "storage",
+    "tabs"
   ],
   "host_permissions": [
     "https://moodle.calvin.edu/*",
@@ -27,9 +35,21 @@
   ],
   "web_accessible_resources": [{
     "resources": ["build/*"],
-    "matches": ["https://moodle.calvin.edu/*"]
+    "matches": [
+      "https://moodle.calvin.edu/*",
+      "file://*/*",
+      "http://localhost:8080/*"
+    ]
   }],
   "background": {
     "service_worker": "scripts/background.js"
+  },
+  "action": {
+    "default_icon": {
+      "16": "images/icon-16.png",
+      "32": "images/icon-32.png",
+      "48": "images/icon-48.png",
+      "128": "images/icon-128.png"
+    }
   }
 } 
