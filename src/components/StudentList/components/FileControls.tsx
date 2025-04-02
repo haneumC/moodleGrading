@@ -26,8 +26,7 @@ const FileControls: React.FC<FileControlsProps> = ({
   showAutoSaveStatus,
   hasData,
   isSaving,
-  hasUnsavedChanges,
-  lastAutoSaveTime
+  hasUnsavedChanges
 }) => {
   const handleSaveProgress = async () => {
     console.log('Manual save triggered');
@@ -100,13 +99,6 @@ const FileControls: React.FC<FileControlsProps> = ({
             />
           </label>
         </div>
-        
-        {/* Display last auto-save time if available */}
-        {lastAutoSaveTime && (
-          <div className="last-autosave">
-            Last auto-save: {lastAutoSaveTime}
-          </div>
-        )}
       </div>
       
       {/* Keep the status messages */}
