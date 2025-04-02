@@ -408,24 +408,38 @@ const Feedback: React.FC<FeedbackProps> = ({
                         size="icon"
                         disabled={!selectedStudent}
                         onClick={() => handleApplyFeedback(item)}
-                        className={`w-6 h-6 ${
+                        className={`w-6 h-6 rounded-full ${
                           selectedStudent && appliedIds.includes(item.id)
-                            ? 'bg-white text-[#4CAF50]' 
-                            : 'text-gray-400'
+                            ? 'bg-white' 
+                            : 'border border-gray-400 hover:border-gray-300'
                         }`}
                       >
-                        ✓
+                        {selectedStudent && appliedIds.includes(item.id) ? (
+                          <i className="bi bi-check text-black"></i>
+                        ) : (
+                          <span></span>
+                        )}
                       </Button>
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteFeedback(item.id)}
-                        className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent"
-                      >
-                        <i className="bi bi-trash"></i>
-                      </Button>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStartEdit(item)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                        >
+                          <i className="bi bi-pencil"></i>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteFeedback(item.id)}
+                          className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent"
+                        >
+                          <i className="bi bi-trash"></i>
+                        </Button>
+                      </div>
                     </TableCell>
                   </>
                 )}
