@@ -155,7 +155,7 @@ const StudentList: React.FC<{
   useEffect(() => {
     console.log('Setting up auto-save interval');
     
-    // Force auto-save to run exactly every 2 minutes (120000 ms)
+    // Force auto-save to run exactly every 1 minute (60000 ms)
     const intervalId = setInterval(() => {
       const now = Date.now();
       
@@ -167,12 +167,12 @@ const StudentList: React.FC<{
       
       // Only run auto-save if we have data and a file handle
       if ((students.length > 0 || feedbackItems.length > 0) && fileHandle) {
-        // Check if it's been at least 2 minutes since the last save
-        if (now - lastSaveTimeRef.current >= 120000) {
+        // Check if it's been at least 1 minute since the last save
+        if (now - lastSaveTimeRef.current >= 60000) {
           console.log('🔄 Auto-save triggered!');
           
           // Even if there are no changes, we'll still show the auto-save notification
-          // This ensures the user sees auto-save happening every 2 minutes
+          // This ensures the user sees auto-save happening every 1 minute
           setIsSaving(true);
           
           // Use the existing save function
@@ -310,16 +310,31 @@ const StudentList: React.FC<{
               }, 5000);
             });
         } else {
-          console.log(`⏳ Next auto-save in ${((120000 - (now - lastSaveTimeRef.current)) / 1000).toFixed(0)} seconds`);
+          console.log(`⏳ Next auto-save in ${((60000 - (now - lastSaveTimeRef.current)) / 1000).toFixed(0)} seconds`);
         }
       } else {
         console.log('❌ Auto-save conditions not met (missing data or file handle)');
       }
-    }, 120000); // 👈 Changed from 30000 to 120000 (2 minutes)
+    }, 60000); // 👈 Changed from 120000 to 60000 (1 minute)
     
     // Clean up the interval when component unmounts
     return () => clearInterval(intervalId);
   }, [fileHandle]); // Only re-create the interval when the file handle changes
+
+  // Check if File System Access API is supported
+  useEffect(() => {
+    const isFileSystemAccessSupported = 'showSaveFilePicker' in window;
+    console.log('File System Access API supported:', isFileSystemAccessSupported);
+    
+    if (!isFileSystemAccessSupported) {
+      console.warn('File System Access API not supported - auto-save will not be available');
+      setAutoSaveStatus('Auto-save not available in this browser');
+      setShowAutoSaveStatus(true);
+      setTimeout(() => {
+        setShowAutoSaveStatus(false);
+      }, 5000);
+    }
+  }, []);
 
   // Fix the date comparison
   const columns: ColumnDef<Student>[] = [
@@ -364,120 +379,132 @@ const StudentList: React.FC<{
 
   // Handle saving progress to localStorage
   const handleSaveProgress = async (autoSave = false): Promise<boolean> => {
+    console.log('handleSaveProgress called with autoSave =', autoSave);
     setIsSaving(true);
+    
     try {
+      // Check if we have any data to save
+      if (students.length === 0) {
+        console.error('No students to save');
+        setError('No data to save. Please import students first.');
+        setIsSaving(false);
+        return false;
+      }
+      
       const data = {
         students,
         assignmentName,
         timestamp: new Date().toISOString(),
         feedbackItems
       };
-      const jsonData = JSON.stringify(data, null, 2);
       
+      console.log('Data prepared for saving:', {
+        studentsCount: students.length,
+        assignmentName,
+        feedbackItemsCount: feedbackItems.length
+      });
+      
+      const jsonData = JSON.stringify(data, null, 2);
+      console.log(`JSON data size: ${jsonData.length} bytes`);
+      
+      // If we already have a file handle, use it
       if (fileHandle) {
         try {
-          console.log(`Saving to file: ${fileHandle.name}`);
-          console.log(`Data size: ${jsonData.length} characters`);
+          console.log(`Saving to existing file: ${fileHandle.name}`);
           
-          // Create a writable stream with specific options
-          const writable = await fileHandle.createWritable({
-            keepExistingData: false // Ensure we completely replace the file
-          });
+          // Check if we have permission to write to the file
+          const permissionStatus = await fileHandle.queryPermission({ mode: 'readwrite' });
+          if (permissionStatus !== 'granted') {
+            console.log('Requesting permission to write to file...');
+            const newPermissionStatus = await fileHandle.requestPermission({ mode: 'readwrite' });
+            if (newPermissionStatus !== 'granted') {
+              throw new Error('Permission to write to file was denied');
+            }
+          }
+          
+          // Create a writable stream
+          const writable = await fileHandle.createWritable();
           
           // Write the data
           await writable.write(jsonData);
-          
-          // Ensure data is flushed to disk
-          await writable.flush();
           
           // Close the stream
           await writable.close();
           
           console.log('✅ File write completed');
           
-          // Add a small delay before verification to ensure file system has completed writing
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Update last save time
+          lastSaveTimeRef.current = Date.now();
           
-          // Verify the file was written correctly
-          const verified = await verifyFileContents(fileHandle, students.length);
-          console.log(`File verification: ${verified ? 'PASSED' : 'FAILED'}`);
+          // Update last saved data
+          lastSavedDataRef.current = jsonData;
           
-          if (!verified) {
-            console.error('❌ File verification failed after save');
-            
-            // Try one more time with a different approach
-            console.log('Attempting alternative save method...');
-            
-            // Try a different approach to writing the file
-            const newWritable = await fileHandle.createWritable();
-            await newWritable.truncate(0); // Clear the file first
-            await newWritable.write(jsonData);
-            await newWritable.close();
-            
-            // Verify again
-            const verifiedRetry = await verifyFileContents(fileHandle, students.length);
-            if (!verifiedRetry) {
-              throw new Error('File verification failed after retry');
-            }
-            console.log('✅ Alternative save method succeeded');
-          }
+          // Reset unsaved changes flag
+          hasUnsavedChangesRef.current = false;
           
-          // Only show status message if it's not an auto-save triggered by data changes
+          // Format current time for display
+          const timeString = new Date().toLocaleTimeString();
+          setLastAutoSaveTime(timeString);
+          
+          // Pass the timestamp up to the parent component
+          onLastAutoSaveTimeUpdate(timeString);
+          
+          // Only show status message if it's not an auto-save
           if (!autoSave) {
-            setAutoSaveStatus('Progress saved successfully');
+            setAutoSaveStatus(`Saved at ${timeString}`);
             setShowAutoSaveStatus(true);
             setTimeout(() => {
               setShowAutoSaveStatus(false);
             }, 3000);
           }
           
-          // Update last save time
-          lastSaveTimeRef.current = Date.now();
-
-          // Add to save history
-          setSaveHistory(prev => [
-            {
-              timestamp: Date.now(),
-              success: true,
-              dataSize: jsonData.length
-            },
-            ...prev.slice(0, 9) // Keep only the last 10 entries
-          ]);
-
           // Set isSaving back to false
           setIsSaving(false);
           return true;
         } catch (error) {
-          console.error('Error saving to existing file:', error);
+          console.error('Error saving to file:', error);
           
-          // If we get a permission error, try to request permission again
-          if (error.name === 'NotAllowedError') {
-            console.log('Permission error, trying to request permission again...');
-            try {
-              // Try to verify permissions
-              const options = {
-                mode: 'readwrite'
-              };
-              await fileHandle.requestPermission(options);
-              
-              // If we get here, we have permission, try saving again
-              console.log('Permission granted, trying to save again...');
-              return handleSaveProgress(autoSave);
-            } catch (permError) {
-              console.error('Failed to get permission:', permError);
-              setFileHandle(null);
-              localStorage.removeItem('lastSaveFileName');
-            }
-          } else {
-            setFileHandle(null);
-            localStorage.removeItem('lastSaveFileName');
+          // If this was triggered by auto-save, don't show a download dialog
+          if (autoSave) {
+            setIsSaving(false);
+            return false;
           }
           
-          // Set isSaving back to false
-          setIsSaving(false);
-          return false;
+          // For manual saves, fall back to download method
+          try {
+            console.log('Falling back to download method');
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            setAutoSaveStatus('File saved as download (auto-save disabled)');
+            setShowAutoSaveStatus(true);
+            setTimeout(() => {
+              setShowAutoSaveStatus(false);
+            }, 5000);
+            
+            // Reset file handle since we couldn't write to it
+            setFileHandle(null);
+            localStorage.removeItem('lastSaveFileName');
+            
+            // Set isSaving back to false
+            setIsSaving(false);
+            return true;
+          } catch (fallbackError) {
+            console.error('Fallback save method failed:', fallbackError);
+            setError('Failed to save progress. Please try again.');
+            setIsSaving(false);
+            return false;
+          }
         }
-      } else if ('showSaveFilePicker' in window) {
+      } else if ('showSaveFilePicker' in window && !autoSave) {
+        // Only show the file picker for manual saves, not auto-saves
         try {
           // No file handle yet, prompt user to create a file
           const options = {
@@ -490,13 +517,22 @@ const StudentList: React.FC<{
             ]
           };
           
+          console.log('Showing save file picker...');
           const newFileHandle = await window.showSaveFilePicker(options);
+          console.log('User selected file:', newFileHandle.name);
+          
           setFileHandle(newFileHandle);
           localStorage.setItem('lastSaveFileName', newFileHandle.name);
           
+          console.log('Creating writable stream...');
           const writable = await newFileHandle.createWritable();
+          
+          console.log('Writing data to file...');
           await writable.write(jsonData);
+          
+          console.log('Closing writable stream...');
           await writable.close();
+          
           console.log('Data saved to new file');
           
           // Show a special message for first save
@@ -508,64 +544,121 @@ const StudentList: React.FC<{
           
           // Update last save time
           lastSaveTimeRef.current = Date.now();
-
-          // Add to save history
-          setSaveHistory(prev => [
-            {
-              timestamp: Date.now(),
-              success: true,
-              dataSize: jsonData.length
-            },
-            ...prev.slice(0, 9) // Keep only the last 10 entries
-          ]);
-
+          
+          // Update last saved data
+          lastSavedDataRef.current = jsonData;
+          
+          // Reset unsaved changes flag
+          hasUnsavedChangesRef.current = false;
+          
+          // Format current time for display
+          const timeString = new Date().toLocaleTimeString();
+          setLastAutoSaveTime(timeString);
+          
+          // Pass the timestamp up to the parent component
+          onLastAutoSaveTimeUpdate(timeString);
+          
           // Set isSaving back to false
           setIsSaving(false);
           return true;
         } catch (error) {
-          // User probably canceled the save dialog
-          console.log('Save operation canceled or failed:', error);
-          // Set isSaving back to false
+          console.error('Save operation failed:', error);
+          
+          // Check if it's an AbortError (user canceled)
+          if (error.name === 'AbortError') {
+            console.log('Save operation was canceled by the user');
+            setIsSaving(false);
+            return false;
+          }
+          
+          // For manual saves, fall back to download method
+          try {
+            console.log('Falling back to download method');
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            setAutoSaveStatus('File saved as download (auto-save disabled)');
+            setShowAutoSaveStatus(true);
+            setTimeout(() => {
+              setShowAutoSaveStatus(false);
+            }, 5000);
+            
+            // Set isSaving back to false
+            setIsSaving(false);
+            return true;
+          } catch (fallbackError) {
+            console.error('Fallback save method failed:', fallbackError);
+            setError('Failed to save progress. Please try again.');
+            setIsSaving(false);
+            return false;
+          }
+        }
+      } else {
+        // This is either an auto-save without a file handle, or a browser without File System Access API
+        
+        // For auto-saves without a file handle, just silently return
+        if (autoSave) {
+          console.log('Auto-save skipped - no file handle available');
           setIsSaving(false);
           return false;
         }
-      } else {
-        // Fallback for browsers that don't support File System Access API
-        const blob = new Blob([jsonData], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
-        a.click();
-        URL.revokeObjectURL(url);
         
-        setAutoSaveStatus('Progress saved successfully');
-        setShowAutoSaveStatus(true);
-        setTimeout(() => {
-          setShowAutoSaveStatus(false);
-        }, 3000);
-        
-        // Update last save time
-        lastSaveTimeRef.current = Date.now();
-
-        // Add to save history
-        setSaveHistory(prev => [
-          {
-            timestamp: Date.now(),
-            success: true,
-            dataSize: jsonData.length
-          },
-          ...prev.slice(0, 9) // Keep only the last 10 entries
-        ]);
-
-        // Set isSaving back to false
-        setIsSaving(false);
-        return true;
+        // For manual saves in browsers without File System Access API, use download method
+        try {
+          console.log('Using download method for browsers without File System Access API');
+          const blob = new Blob([jsonData], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          
+          setAutoSaveStatus('Progress saved as download');
+          setShowAutoSaveStatus(true);
+          setTimeout(() => {
+            setShowAutoSaveStatus(false);
+          }, 3000);
+          
+          // Update last save time
+          lastSaveTimeRef.current = Date.now();
+          
+          // Update last saved data
+          lastSavedDataRef.current = jsonData;
+          
+          // Reset unsaved changes flag
+          hasUnsavedChangesRef.current = false;
+          
+          // Format current time for display
+          const timeString = new Date().toLocaleTimeString();
+          setLastAutoSaveTime(timeString);
+          
+          // Pass the timestamp up to the parent component
+          onLastAutoSaveTimeUpdate(timeString);
+          
+          // Set isSaving back to false
+          setIsSaving(false);
+          return true;
+        } catch (error) {
+          console.error('Error saving progress:', error);
+          setError('Failed to save progress. Please try again.');
+          setIsSaving(false);
+          return false;
+        }
       }
     } catch (error) {
       setIsSaving(false);
-      console.error('Error saving progress:', error);
-      setError('Failed to save progress. Please try again.');
+      console.error('Error preparing data for save:', error);
+      setError('Failed to prepare data for saving. Please try again.');
       return false;
     }
   };

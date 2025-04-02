@@ -12,6 +12,7 @@ export interface FeedbackProps {
   onChangeTracked: (change: ChangeRecord) => void;
   onFeedbackSelect?: (feedbackId: number) => void;
   selectedFeedbackId?: number | null;
+  onSaveProgress?: () => Promise<boolean | void>;
 }
 
 export type { FeedbackProps }; 

@@ -233,7 +233,8 @@ const Feedback: React.FC<FeedbackProps> = ({
   onStudentsUpdate,
   onChangeTracked,
   onFeedbackSelect,
-  selectedFeedbackId
+  selectedFeedbackId,
+  onSaveProgress
 }) => {
   const [isAddingFeedback, setIsAddingFeedback] = useState(false);
   const [newFeedback, setNewFeedback] = useState<Omit<FeedbackItem, 'id' | 'applied'>>({ 
@@ -331,6 +332,9 @@ const Feedback: React.FC<FeedbackProps> = ({
         return student;
       })
     );
+    
+    // We're not triggering auto-save here anymore
+    // The auto-save interval will handle it
   };
 
   const handleAddFeedback = () => {

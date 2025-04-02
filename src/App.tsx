@@ -451,6 +451,7 @@ const MainApp = () => {
             onChangeTracked={handleChangeTracked}
             onFeedbackSelect={handleFeedbackSelect}
             selectedFeedbackId={selectedFeedbackId}
+            onSaveProgress={handleSaveProgress}
           />
         </div>
         <div className="right">

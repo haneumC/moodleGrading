@@ -1,5 +1,6 @@
 import React from 'react';
 import StatusMessage from '@/components/StatusMessage/StatusMessage';
+import './FileControls.css';
 
 interface FileControlsProps {
   onFileImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -12,6 +13,7 @@ interface FileControlsProps {
   hasData: boolean;
   isSaving: boolean;
   hasUnsavedChanges: boolean;
+  lastAutoSaveTime?: string;
 }
 
 const FileControls: React.FC<FileControlsProps> = ({ 
@@ -24,7 +26,8 @@ const FileControls: React.FC<FileControlsProps> = ({
   showAutoSaveStatus,
   hasData,
   isSaving,
-  hasUnsavedChanges
+  hasUnsavedChanges,
+  lastAutoSaveTime
 }) => {
   const handleSaveProgress = async () => {
     console.log('Manual save triggered');
@@ -97,6 +100,13 @@ const FileControls: React.FC<FileControlsProps> = ({
             />
           </label>
         </div>
+        
+        {/* Display last auto-save time if available */}
+        {lastAutoSaveTime && (
+          <div className="last-autosave">
+            Last auto-save: {lastAutoSaveTime}
+          </div>
+        )}
       </div>
       
       {/* Keep the status messages */}
