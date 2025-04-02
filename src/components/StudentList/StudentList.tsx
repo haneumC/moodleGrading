@@ -303,7 +303,7 @@ const StudentList: React.FC<{
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Modify the handleSaveProgress function to use onSaveData
+  // Modify the handleSaveProgress function to show auto-save enabled indicator
   const handleSaveProgress = async (autoSave = false): Promise<boolean> => {
     console.log('handleSaveProgress called with autoSave =', autoSave);
     setIsSaving(true);
@@ -327,6 +327,16 @@ const StudentList: React.FC<{
         
         // Reset isNewImport after successful save
         setIsNewImport(false);
+        
+        // Set file handle if it's not already set (first save)
+        if (!fileHandle) {
+          // Show auto-save enabled message
+          setAutoSaveStatus('Auto-save enabled');
+          setShowAutoSaveStatus(true);
+          setTimeout(() => {
+            setShowAutoSaveStatus(false);
+          }, 3000);
+        }
       }
       
       setIsSaving(false);
