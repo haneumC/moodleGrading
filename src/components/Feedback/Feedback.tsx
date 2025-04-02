@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -13,10 +13,194 @@ import { Textarea } from "@/components/ui/textarea";
 import 'bootstrap-icons/font/bootstrap-icons.css';
 import { FeedbackItem } from '@/components/StudentList/types';
 import { FeedbackProps } from './types';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers';
 
-// Only keep the types we're using
+// Define types for sorting
 type SortField = 'text' | 'deduction' | 'applied';
 type SortDirection = 'asc' | 'desc';
+
+interface SortableItemProps {
+  id: number;
+  item: FeedbackItem;
+  editingId: number | null;
+  editingText: string;
+  editingDeduction: number;
+  appliedIds: number[];
+  selectedStudent: string | null;
+  onStartEdit: (item: FeedbackItem) => void;
+  onAcceptEdit: (id: number) => void;
+  onRejectEdit: () => void;
+  onApplyFeedback: (item: FeedbackItem) => void;
+  onDeleteFeedback: (id: number) => void;
+  setEditingText: (text: string) => void;
+  setEditingDeduction: (value: number) => void;
+}
+
+const SortableItem = ({
+  id,
+  item,
+  editingId,
+  editingText,
+  editingDeduction,
+  appliedIds,
+  selectedStudent,
+  onStartEdit,
+  onAcceptEdit,
+  onRejectEdit,
+  onApplyFeedback,
+  onDeleteFeedback,
+  setEditingText,
+  setEditingDeduction,
+}: SortableItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow ref={setNodeRef} style={style}>
+      {editingId === item.id ? (
+        <>
+          <TableCell>
+            <Textarea
+              value={editingText}
+              onChange={(e) => setEditingText(e.target.value)}
+              className="bg-[#2d2d2d] border-[#444] text-white min-h-[60px] resize-y"
+            />
+          </TableCell>
+          <TableCell>
+            <Input
+              type="number"
+              value={editingDeduction}
+              onChange={(e) => setEditingDeduction(Number(e.target.value))}
+              className="w-[80px] bg-[#2d2d2d] border-[#444] text-white"
+              min={0}
+              max={20}
+            />
+          </TableCell>
+          <TableCell>
+            <div className="flex space-x-2">
+              <Button 
+                onClick={() => onAcceptEdit(item.id)}
+                className="bg-[#4CAF50] hover:bg-[#45a049] text-white"
+                size="sm"
+              >
+                ✓
+              </Button>
+              <Button 
+                onClick={onRejectEdit}
+                className="bg-[#f44336] hover:bg-[#d32f2f] text-white"
+                size="sm"
+              >
+                ✕
+              </Button>
+            </div>
+          </TableCell>
+        </>
+      ) : (
+        <>
+          <TableCell>
+            <div 
+              className={`p-2 rounded border-l-4 transition-colors whitespace-pre-wrap break-words ${
+                appliedIds.includes(item.id)
+                  ? 'bg-[#2d4a3e] border-[#4CAF50] text-[#e1e1e1]'
+                  : 'bg-[#3a3f4b] border-[#5c6bc0] text-[#e1e1e1] hover:bg-[#454b5a]'
+              }`}
+            >
+              <div {...attributes} {...listeners} className="cursor-move inline-block">
+                <i className="bi bi-grip-vertical mr-2 text-gray-500"></i>
+              </div>
+              <span 
+                className="cursor-pointer hover:bg-[#454b5a] p-1 rounded transition-colors inline-block"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStartEdit(item);
+                }}
+              >
+                {item.comment}
+              </span>
+            </div>
+          </TableCell>
+          <TableCell 
+            className="text-right pr-5 text-white cursor-pointer"
+            onClick={() => onStartEdit(item)}
+          >
+            {item.grade}
+          </TableCell>
+          <TableCell>
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={!selectedStudent}
+              onClick={() => onApplyFeedback(item)}
+              className={`w-6 h-6 rounded-full ${
+                selectedStudent && appliedIds.includes(item.id)
+                  ? 'bg-white' 
+                  : 'border border-gray-400 hover:border-gray-300'
+              }`}
+            >
+              {selectedStudent && appliedIds.includes(item.id) ? (
+                <i className="bi bi-check text-black"></i>
+              ) : (
+                <span></span>
+              )}
+            </Button>
+          </TableCell>
+          <TableCell>
+            <div className="flex space-x-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onStartEdit(item)}
+                className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+              >
+                <i className="bi bi-pencil"></i>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDeleteFeedback(item.id)}
+                className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent"
+              >
+                <i className="bi bi-trash"></i>
+              </Button>
+            </div>
+          </TableCell>
+        </>
+      )}
+    </TableRow>
+  );
+};
 
 const Feedback: React.FC<FeedbackProps> = ({ 
   selectedStudent, 
@@ -39,68 +223,18 @@ const Feedback: React.FC<FeedbackProps> = ({
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [reusableIds, setReusableIds] = useState<number[]>([]);
   const [nextId, setNextId] = useState<number>(5);
-  
-  // For drag and drop
-  const [draggedItem, setDraggedItem] = useState<FeedbackItem | null>(null);
-  const [draggedOverItemId, setDraggedOverItemId] = useState<number | null>(null);
-
-  // Add a new state to track whether we're using manual ordering or sorting
   const [useManualOrder, setUseManualOrder] = useState(false);
 
-  // Handle functions for drag and drop
-  const handleDragStart = (e: React.DragEvent, item: FeedbackItem) => {
-    setDraggedItem(item);
-    e.dataTransfer.effectAllowed = 'move';
-    // Add a ghost image
-    const ghostElement = document.createElement('div');
-    ghostElement.classList.add('drag-ghost');
-    ghostElement.textContent = item.comment;
-    document.body.appendChild(ghostElement);
-    e.dataTransfer.setDragImage(ghostElement, 20, 20);
-    setTimeout(() => {
-      document.body.removeChild(ghostElement);
-    }, 0);
-  };
-
-  const handleDragOver = (e: React.DragEvent, itemId: number) => {
-    e.preventDefault();
-    if (draggedItem && draggedItem.id !== itemId) {
-      setDraggedOverItemId(itemId);
-    }
-  };
-
-  const handleDragEnd = () => {
-    setDraggedItem(null);
-    setDraggedOverItemId(null);
-  };
-
-  const handleDrop = (e: React.DragEvent, targetId: number) => {
-    e.preventDefault();
-    
-    if (!draggedItem || draggedItem.id === targetId) {
-      return;
-    }
-    
-    // Switch to manual ordering mode
-    setUseManualOrder(true);
-    
-    // Reorder the items
-    const items = [...feedbackItems];
-    const draggedItemIndex = items.findIndex(item => item.id === draggedItem.id);
-    const targetIndex = items.findIndex(item => item.id === targetId);
-    
-    if (draggedItemIndex !== -1 && targetIndex !== -1) {
-      // Remove the dragged item
-      const [removed] = items.splice(draggedItemIndex, 1);
-      // Insert it at the target position
-      items.splice(targetIndex, 0, removed);
-      
-      setFeedbackItems(items);
-    }
-    
-    setDraggedItem(null);
-    setDraggedOverItemId(null);
-  };
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const handleApplyFeedback = (feedbackItem: FeedbackItem) => {
     if (!selectedStudent) return;
@@ -276,177 +410,100 @@ const Feedback: React.FC<FeedbackProps> = ({
     }
   };
 
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    
+    if (over && active.id !== over.id) {
+      // Switch to manual ordering mode
+      setUseManualOrder(true);
+      
+      setFeedbackItems((prevItems: FeedbackItem[]) => {
+        const oldIndex = prevItems.findIndex((item: FeedbackItem) => item.id === active.id);
+        const newIndex = prevItems.findIndex((item: FeedbackItem) => item.id === over.id);
+        
+        return arrayMove([...prevItems], oldIndex, newIndex);
+      });
+    }
+  };
+
   const sortedItems = getSortedFeedbackItems();
 
   return (
-    <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-380px)] flex flex-col mt-5">
+    <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-280px)] flex flex-col mt-5">
       <div className="overflow-y-auto flex-1 mb-4">
-        <Table>
-          <TableHeader className="border-b border-[#444]">
-            <TableRow className="hover:bg-transparent">
-              <TableHead 
-                className="text-[#e1e1e1] cursor-pointer"
-                onClick={() => handleSort('text')}
-              >
-                Feedback
-                {sortField === 'text' && (
-                  <span className="ml-2">
-                    {sortDirection === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </TableHead>
-              <TableHead 
-                className="w-[100px] text-[#e1e1e1] cursor-pointer"
-                onClick={() => handleSort('deduction')}
-              >
-                Deduction
-                {sortField === 'deduction' && (
-                  <span className="ml-2">
-                    {sortDirection === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </TableHead>
-              <TableHead 
-                className="w-[80px] text-[#e1e1e1] cursor-pointer"
-                onClick={() => handleSort('applied')}
-              >
-                Apply
-                {sortField === 'applied' && (
-                  <span className="ml-2">
-                    {sortDirection === 'asc' ? '↑' : '↓'}
-                  </span>
-                )}
-              </TableHead>
-              <TableHead className="w-[100px] text-[#e1e1e1]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedItems.map((item) => (
-              <TableRow 
-                key={item.id} 
-                className={`border-b border-[#333] ${
-                  draggedOverItemId === item.id 
-                    ? 'bg-[#3a3a3a] border-t-2 border-blue-500' 
-                    : 'hover:bg-[#2d2d2d]'
-                } ${
-                  draggedItem?.id === item.id ? 'opacity-50' : ''
-                }`}
-                draggable={editingId !== item.id}
-                onDragStart={(e) => handleDragStart(e, item)}
-                onDragOver={(e) => handleDragOver(e, item.id)}
-                onDragEnd={handleDragEnd}
-                onDrop={(e) => handleDrop(e, item.id)}
-              >
-                {editingId === item.id ? (
-                  <>
-                    <TableCell>
-                      <Textarea
-                        value={editingText}
-                        onChange={(e) => setEditingText(e.target.value)}
-                        className="bg-[#2d2d2d] border-[#444] text-white min-h-[60px] resize-y"
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Input
-                        type="number"
-                        value={editingDeduction}
-                        onChange={(e) => setEditingDeduction(Number(e.target.value))}
-                        className="w-[80px] bg-[#2d2d2d] border-[#444] text-white"
-                        min={0}
-                        max={20}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button 
-                          onClick={() => handleAcceptEdit(item.id)}
-                          className="bg-[#4CAF50] hover:bg-[#45a049] text-white"
-                          size="sm"
-                        >
-                          ✓
-                        </Button>
-                        <Button 
-                          onClick={handleRejectEdit}
-                          className="bg-[#f44336] hover:bg-[#d32f2f] text-white"
-                          size="sm"
-                        >
-                          ✕
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </>
-                ) : (
-                  <>
-                    <TableCell 
-                      className="cursor-pointer"
-                      onClick={() => handleStartEdit(item)}
-                    >
-                      <div className="flex items-center">
-                        <div className="mr-2 text-gray-400 cursor-grab">
-                          <i className="bi bi-grip-vertical"></i>
-                        </div>
-                        <div 
-                          className={`p-2 rounded border-l-4 transition-colors whitespace-pre-wrap break-words flex-1 ${
-                            appliedIds.includes(item.id)
-                              ? 'bg-[#2d4a3e] border-[#4CAF50] text-[#e1e1e1]'  // Highlighted state
-                              : 'bg-[#3a3f4b] border-[#5c6bc0] text-[#e1e1e1] hover:bg-[#454b5a]'  // Normal state
-                          }`}
-                        >
-                          {item.comment}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell 
-                      className="text-right pr-5 text-white cursor-pointer"
-                      onClick={() => handleStartEdit(item)}
-                    >
-                      {item.grade}
-                    </TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        disabled={!selectedStudent}
-                        onClick={() => handleApplyFeedback(item)}
-                        className={`w-6 h-6 rounded-full ${
-                          selectedStudent && appliedIds.includes(item.id)
-                            ? 'bg-white' 
-                            : 'border border-gray-400 hover:border-gray-300'
-                        }`}
-                      >
-                        {selectedStudent && appliedIds.includes(item.id) ? (
-                          <i className="bi bi-check text-black"></i>
-                        ) : (
-                          <span></span>
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleStartEdit(item)}
-                          className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
-                        >
-                          <i className="bi bi-pencil"></i>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteFeedback(item.id)}
-                          className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent"
-                        >
-                          <i className="bi bi-trash"></i>
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </>
-                )}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+          modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+        >
+          <Table>
+            <TableHeader className="border-b border-[#444]">
+              <TableRow className="hover:bg-transparent">
+                <TableHead 
+                  className="text-[#e1e1e1] cursor-pointer"
+                  onClick={() => handleSort('text')}
+                >
+                  Feedback
+                  {sortField === 'text' && (
+                    <span className="ml-2">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </TableHead>
+                <TableHead 
+                  className="w-[100px] text-[#e1e1e1] cursor-pointer"
+                  onClick={() => handleSort('deduction')}
+                >
+                  Deduction
+                  {sortField === 'deduction' && (
+                    <span className="ml-2">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </TableHead>
+                <TableHead 
+                  className="w-[80px] text-[#e1e1e1] cursor-pointer"
+                  onClick={() => handleSort('applied')}
+                >
+                  Apply
+                  {sortField === 'applied' && (
+                    <span className="ml-2">
+                      {sortDirection === 'asc' ? '↑' : '↓'}
+                    </span>
+                  )}
+                </TableHead>
+                <TableHead className="w-[100px] text-[#e1e1e1]">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              <SortableContext
+                items={sortedItems.map(item => item.id)}
+                strategy={verticalListSortingStrategy}
+              >
+                {sortedItems.map((item) => (
+                  <SortableItem
+                    key={item.id}
+                    id={item.id}
+                    item={item}
+                    editingId={editingId}
+                    editingText={editingText}
+                    editingDeduction={editingDeduction}
+                    appliedIds={appliedIds}
+                    selectedStudent={selectedStudent}
+                    onStartEdit={handleStartEdit}
+                    onAcceptEdit={handleAcceptEdit}
+                    onRejectEdit={handleRejectEdit}
+                    onApplyFeedback={handleApplyFeedback}
+                    onDeleteFeedback={handleDeleteFeedback}
+                    setEditingText={setEditingText}
+                    setEditingDeduction={setEditingDeduction}
+                  />
+                ))}
+              </SortableContext>
+            </TableBody>
+          </Table>
+        </DndContext>
 
         {isAddingFeedback ? (
           <div className="mt-2 p-4 bg-[#2d2d2d] rounded-md space-y-4">
