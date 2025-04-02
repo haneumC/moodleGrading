@@ -480,6 +480,7 @@ const MainApp = () => {
             onLastAutoSaveTimeUpdate={handleLastAutoSaveTimeUpdate}
             selectedFeedbackId={selectedFeedbackId}
             onSaveData={saveData}
+            onFileHandleCreated={(handle) => setSavedFileHandle(handle)}
           />
         </div>
       </main>

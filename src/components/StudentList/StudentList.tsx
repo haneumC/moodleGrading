@@ -56,6 +56,7 @@ const StudentList: React.FC<{
   onLastAutoSaveTimeUpdate: (time: string) => void;
   selectedFeedbackId: number | null;
   onSaveData: (showStatus: boolean, isAuto: boolean) => Promise<boolean>;
+  onFileHandleCreated: (handle: FileSystemFileHandle) => void;
 }> = ({
   students,
   setStudents,
@@ -68,7 +69,8 @@ const StudentList: React.FC<{
   setFeedbackItems,
   onLastAutoSaveTimeUpdate,
   selectedFeedbackId,
-  onSaveData
+  onSaveData,
+  onFileHandleCreated
 }) => {
   console.log('StudentList received students:', students);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -82,12 +84,21 @@ const StudentList: React.FC<{
   const hasUnsavedChangesRef = useRef<boolean>(false);
   const lastSavedDataRef = useRef<string>('');
 
-  const { handleFileChange, exportForMoodle } = useCSVHandling(
+  // Add a new state variable
+  const [isNewImport, setIsNewImport] = useState<boolean>(false);
+
+  const { handleFileChange: originalHandleFileChange, exportForMoodle } = useCSVHandling(
     setStudents, 
     assignmentName, 
     students,
     onChangeTracked
   );
+
+  // Wrap the original handleFileChange to set isNewImport
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    originalHandleFileChange(e);
+    setIsNewImport(true);
+  };
 
   // Add these new state variables
   const [showDebugPanel, setShowDebugPanel] = useState<boolean>(false);
@@ -102,6 +113,9 @@ const StudentList: React.FC<{
 
   // Add this state variable to track the last auto-save time
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
+
+  // Add a state to track if a file is loaded but auto-save isn't enabled yet
+  const [fileLoadedNoAutoSave, setFileLoadedNoAutoSave] = useState(false);
 
   // Add a keyboard shortcut to toggle the debug panel
   useEffect(() => {
@@ -310,6 +324,9 @@ const StudentList: React.FC<{
         // Format current time for display
         const timeString = new Date().toLocaleTimeString();
         setLastAutoSaveTime(timeString);
+        
+        // Reset isNewImport after successful save
+        setIsNewImport(false);
       }
       
       setIsSaving(false);
@@ -322,47 +339,135 @@ const StudentList: React.FC<{
   };
 
   // Handle loading progress from a file
-  const handleLoadProgress = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadProgress = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Check if this is a JSON file (previously saved progress)
+    const isProgressFile = file.name.endsWith('.json');
+    
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
-        const data = JSON.parse(content) as SaveData;
         
-        setStudents(data.students);
-        setAssignmentName(data.assignmentName);
-        if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
-          setFeedbackItems(data.feedbackItems);
+        // If it's a JSON file, parse it as a progress file
+        if (isProgressFile) {
+          const data = JSON.parse(content) as SaveData;
+          
+          setStudents(data.students);
+          setAssignmentName(data.assignmentName);
+          if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
+            setFeedbackItems(data.feedbackItems);
+          }
+          
+          // Update last saved data reference
+          lastSavedDataRef.current = JSON.stringify({ 
+            students: data.students, 
+            feedbackItems: data.feedbackItems || [] 
+          });
+          
+          // Reset unsaved changes flag
+          hasUnsavedChangesRef.current = false;
+          
+          // Track the import
+          onChangeTracked({
+            type: 'import',
+            studentName: 'System',
+            timestamp: new Date().toISOString(),
+            message: 'Progress data imported',
+            oldValue: '',
+            newValue: ''
+          });
+          
+          // Store the file content for later use
+          sessionStorage.setItem('loadedFileContent', content);
+          sessionStorage.setItem('loadedFileName', file.name);
+          
+          // Set a flag to show the enable auto-save button
+          setFileLoadedNoAutoSave(true);
+          
+          // Show a message about enabling auto-save
+          setAutoSaveStatus('File loaded. Click "Enable Auto-Save" to continue.');
+          setShowAutoSaveStatus(true);
+          
+        } else {
+          // This is a CSV import from Moodle, not a progress file
+          // Don't prompt for auto-save yet - wait for the user to manually save first
+          setAutoSaveStatus('New data imported. Save progress to enable auto-save.');
+          setShowAutoSaveStatus(true);
+          setTimeout(() => {
+            setShowAutoSaveStatus(false);
+          }, 5000);
         }
-        
-        // Update last saved data reference
-        lastSavedDataRef.current = JSON.stringify({ 
-          students: data.students, 
-          feedbackItems: data.feedbackItems || [] 
-        });
-        
-        // Reset unsaved changes flag
-        hasUnsavedChangesRef.current = false;
-        
-        // Track the import
-        onChangeTracked({
-          type: 'import',
-          studentName: 'System',
-          timestamp: new Date().toISOString(),
-          message: 'Progress data imported',
-          oldValue: '',
-          newValue: ''
-        });
-        
       } catch (error) {
-        console.error('Error parsing JSON:', error);
-        setError("Invalid progress file");
+        console.error('Error parsing file:', error);
+        setError("Invalid file format");
       }
     };
     reader.readAsText(file);
+  };
+
+  // Update the handleEnableAutoSave function
+  const handleEnableAutoSave = async () => {
+    try {
+      const fileName = sessionStorage.getItem('loadedFileName') || "your_progress.json";
+      const content = sessionStorage.getItem('loadedFileContent');
+      
+      if (!content) {
+        setError("Could not retrieve file content. Please try loading the file again.");
+        return;
+      }
+      
+      const options = {
+        suggestedName: fileName,
+        types: [{
+          description: 'JSON Files',
+          accept: { 'application/json': ['.json'] },
+        }],
+      };
+      
+      // Show the save picker to get a file handle
+      const handle = await window.showSaveFilePicker(options);
+      setFileHandle(handle);
+      onFileHandleCreated(handle);
+      
+      // Save the file immediately to the selected location
+      const writable = await handle.createWritable();
+      await writable.write(content);
+      await writable.close();
+      
+      // Update the last save time
+      lastSaveTimeRef.current = Date.now();
+      const timeString = new Date().toLocaleTimeString();
+      setLastAutoSaveTime(timeString);
+      onLastAutoSaveTimeUpdate(timeString);
+      
+      setAutoSaveStatus('Auto-save enabled');
+      setShowAutoSaveStatus(true);
+      setTimeout(() => {
+        setShowAutoSaveStatus(false);
+      }, 3000);
+      
+      // Clear the session storage
+      sessionStorage.removeItem('loadedFileContent');
+      sessionStorage.removeItem('loadedFileName');
+      
+      // Reset the flag
+      setFileLoadedNoAutoSave(false);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('User cancelled the save dialog');
+        setAutoSaveStatus('Auto-save not enabled (no file location selected)');
+        setShowAutoSaveStatus(true);
+        setTimeout(() => {
+          setShowAutoSaveStatus(false);
+        }, 5000);
+      } else {
+        console.error('Error setting up auto-save:', err);
+        setError('Failed to enable auto-save. You will need to save manually.');
+      }
+    }
   };
 
   return (
@@ -378,7 +483,10 @@ const StudentList: React.FC<{
           showAutoSaveStatus={showAutoSaveStatus}
           hasData={students.length > 0}
           isSaving={isSaving}
-          lastAutoSaveTime={lastAutoSaveTime}
+          fileHandle={fileHandle}
+          isNewImport={isNewImport}
+          fileLoadedNoAutoSave={fileLoadedNoAutoSave}
+          onEnableAutoSave={handleEnableAutoSave}
         />
         <div className="rounded-md border">
           <div className="table-container">

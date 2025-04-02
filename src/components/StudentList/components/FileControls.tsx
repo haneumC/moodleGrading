@@ -13,6 +13,10 @@ interface FileControlsProps {
   hasData: boolean;
   isSaving: boolean;
   lastAutoSaveTime?: string;
+  fileHandle?: FileSystemFileHandle;
+  isNewImport: boolean;
+  fileLoadedNoAutoSave?: boolean;
+  onEnableAutoSave?: () => void;
 }
 
 const FileControls: React.FC<FileControlsProps> = ({ 
@@ -24,7 +28,11 @@ const FileControls: React.FC<FileControlsProps> = ({
   autoSaveStatus,
   showAutoSaveStatus,
   hasData,
-  isSaving
+  isSaving,
+  fileHandle,
+  isNewImport,
+  fileLoadedNoAutoSave,
+  onEnableAutoSave
 }) => {
   const handleSaveProgress = async () => {
     console.log('Manual save triggered');
@@ -96,7 +104,30 @@ const FileControls: React.FC<FileControlsProps> = ({
               style={{ display: 'none' }}
             />
           </label>
+          {fileLoadedNoAutoSave && (
+            <button 
+              className="studentBtn highlight-btn" 
+              onClick={onEnableAutoSave}
+            >
+              Enable Auto-Save
+            </button>
+          )}
         </div>
+        
+        {/* Show different messages based on whether this is a new import or loaded file */}
+        {isNewImport && !fileHandle && (
+          <div className="import-status">
+            <span className="import-dot"></span>
+            New data imported. Click "Save Progress" to enable auto-save.
+          </div>
+        )}
+        
+        {fileHandle && (
+          <div className="auto-save-enabled">
+            <span className="auto-save-dot"></span>
+            Auto-save enabled
+          </div>
+        )}
       </div>
       
       {/* Keep the status messages */}
@@ -111,6 +142,13 @@ const FileControls: React.FC<FileControlsProps> = ({
         <StatusMessage 
           message={autoSaveStatus} 
           type="success" 
+          icon="💾"
+        />
+      )}
+      {autoSaveStatus === 'Please select a location to enable auto-save...' && (
+        <StatusMessage 
+          message="Please select where to save this file to enable auto-save" 
+          type="info" 
           icon="💾"
         />
       )}
