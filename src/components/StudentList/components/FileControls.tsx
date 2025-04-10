@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import StatusMessage from '@/components/StatusMessage/StatusMessage';
 import './FileControls.css';
 
@@ -6,7 +6,7 @@ interface FileControlsProps {
   onFileImport: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onExport: () => void;
   onSaveProgress: () => Promise<boolean | void>;
-  onLoadProgress: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onLoadProgress: (e: React.ChangeEvent<HTMLInputElement>, options?: { loadStudents: boolean; loadFeedback: boolean }) => void;
   error: string;
   autoSaveStatus: string;
   showAutoSaveStatus: boolean;
@@ -34,6 +34,11 @@ const FileControls: React.FC<FileControlsProps> = ({
   fileLoadedNoAutoSave,
   onEnableAutoSave
 }) => {
+  const [showLoadOptions, setShowLoadOptions] = useState(false);
+  const [loadStudents, setLoadStudents] = useState(true);
+  const [loadFeedback, setLoadFeedback] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const handleSaveProgress = async () => {
     console.log('Manual save triggered');
     
@@ -50,6 +55,15 @@ const FileControls: React.FC<FileControlsProps> = ({
       console.log('Verifying file was updated...');
       // Additional verification could be added here
     }
+  };
+
+  const handleLoadClick = () => {
+    setShowLoadOptions(!showLoadOptions);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onLoadProgress(e, { loadStudents, loadFeedback });
+    setShowLoadOptions(false);
   };
 
   return (
@@ -95,15 +109,51 @@ const FileControls: React.FC<FileControlsProps> = ({
               'Save Progress'
             )}
           </button>
-          <label className="studentBtn" style={{ cursor: 'pointer' }}>
-            Load Progress
-            <input
-              type="file"
-              accept=".json"
-              onChange={onLoadProgress}
-              style={{ display: 'none' }}
-            />
-          </label>
+          <div className="load-progress-container">
+            <button 
+              className="studentBtn" 
+              onClick={handleLoadClick}
+              style={{ cursor: 'pointer' }}
+            >
+              Load Progress
+            </button>
+            {showLoadOptions && (
+              <div className="load-options">
+                <div className="checkbox-container">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={loadStudents}
+                      onChange={(e) => setLoadStudents(e.target.checked)}
+                    />
+                    Load Students
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={loadFeedback}
+                      onChange={(e) => setLoadFeedback(e.target.checked)}
+                    />
+                    Load Feedback
+                  </label>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+                <button 
+                  className="studentBtn confirm-load"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={!loadStudents && !loadFeedback}
+                >
+                  Confirm Load
+                </button>
+              </div>
+            )}
+          </div>
           {fileLoadedNoAutoSave && (
             <button 
               className="studentBtn highlight-btn" 

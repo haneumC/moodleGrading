@@ -346,9 +346,19 @@ const StudentList: React.FC<{
   };
 
   // Handle loading progress from a file
-  const handleLoadProgress = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadProgress = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    options?: { loadStudents: boolean; loadFeedback: boolean }
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Default to loading both if no options provided
+    const loadOptions = {
+      loadStudents: true,
+      loadFeedback: true,
+      ...options
+    };
 
     // Check if this is a JSON file (previously saved progress)
     const isProgressFile = file.name.endsWith('.json');
@@ -362,16 +372,20 @@ const StudentList: React.FC<{
         if (isProgressFile) {
           const data = JSON.parse(content) as SaveData;
           
-          setStudents(data.students);
-          setAssignmentName(data.assignmentName);
-          if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
+          // Selectively load students and feedback based on options
+          if (loadOptions.loadStudents) {
+            setStudents(data.students);
+            setAssignmentName(data.assignmentName);
+          }
+          
+          if (loadOptions.loadFeedback && Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
             setFeedbackItems(data.feedbackItems);
           }
           
           // Update last saved data reference
           lastSavedDataRef.current = JSON.stringify({ 
-            students: data.students, 
-            feedbackItems: data.feedbackItems || [] 
+            students: loadOptions.loadStudents ? data.students : students,
+            feedbackItems: loadOptions.loadFeedback ? data.feedbackItems : feedbackItems
           });
           
           // Reset unsaved changes flag
@@ -382,7 +396,7 @@ const StudentList: React.FC<{
             type: 'import',
             studentName: 'System',
             timestamp: new Date().toISOString(),
-            message: 'Progress data imported',
+            message: `Progress data imported (${loadOptions.loadStudents ? 'students' : ''}${loadOptions.loadStudents && loadOptions.loadFeedback ? ' and ' : ''}${loadOptions.loadFeedback ? 'feedback' : ''})`,
             oldValue: '',
             newValue: ''
           });
