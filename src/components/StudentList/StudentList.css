@@ -1,6 +1,7 @@
 .layout {
   display: flex;
   height: 80vh;
+  width: 100%;
 }
 
 .listSection {
@@ -8,6 +9,8 @@
   background-color: #3d3c3f;
   color: #fff;
   border-radius: 8px;
+  width: 100%;
+  overflow: hidden;
 }
 
 .buttons {
@@ -50,9 +53,12 @@
 
 .header-cell {
   color: white !important;
-  padding: 12px;
+  padding: 8px 12px;
   font-weight: 500;
-  font-size: 1.1rem !important;
+  font-size: 1rem !important;
+  line-height: 24px;
+  vertical-align: middle;
+  text-align: left;
 }
 
 .header-cell:hover {
@@ -63,20 +69,14 @@
 .table-container {
   background-color: #3d3c3f;
   border-radius: 8px;
-  overflow: hidden;
-  max-height: 70vh;
-}
-
-.table-container tbody {
-  display: block;
-  overflow-y: auto;
-  max-height: calc(70vh - 50px);
-}
-
-.table-container thead,
-.table-container tbody tr {
-  display: table;
+  overflow: auto;
+  max-height: calc(80vh - 150px);
   width: 100%;
+}
+
+.table-container table {
+  width: 100%;
+  border-collapse: collapse;
   table-layout: fixed;
 }
 
@@ -84,18 +84,41 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  background-color: #878787;
 }
 
 .table-container th,
 .table-container td {
-  width: 20%;
-  padding: 12px;
+  padding: 8px 12px;
   font-size: 1rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.table-container table {
-  width: 100%;
-  border-collapse: collapse;
+.table-container th:nth-child(1),
+.table-container td:nth-child(1) {
+  width: 25%;
+}
+
+.table-container th:nth-child(2),
+.table-container td:nth-child(2) {
+  width: 25%;
+}
+
+.table-container th:nth-child(3),
+.table-container td:nth-child(3) {
+  width: 15%;
+}
+
+.table-container th:nth-child(4),
+.table-container td:nth-child(4) {
+  width: 30%;
+}
+
+.table-container th:nth-child(5),
+.table-container td:nth-child(5) {
+  width: 35%;
 }
 
 .table-container::-webkit-scrollbar {

@@ -370,16 +370,6 @@ const StudentList: React.FC<{
     { accessorKey: "name", header: "Name", cell: info => info.getValue() },
     { accessorKey: "email", header: "Email", cell: info => info.getValue() },
     {
-      accessorKey: "lastModifiedSubmission",
-      header: "Last Modified",
-      cell: info => info.getValue(),
-      sortingFn: (rowA, rowB) => {
-        const dateA = rowA.original.lastModifiedSubmission || '';
-        const dateB = rowB.original.lastModifiedSubmission || '';
-        return new Date(dateA).getTime() - new Date(dateB).getTime();
-      },
-    },
-    {
       accessorKey: "grade",
       header: "Grade",
       cell: info => info.getValue() || '',
