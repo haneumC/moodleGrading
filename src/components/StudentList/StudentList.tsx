@@ -766,24 +766,20 @@ const StudentList: React.FC<{
       return;
     }
     
-    // Save progress first
-    handleSaveProgress().then((success) => {
-      if (success) {
-        // Write grades and feedback to Moodle's interface
-        const event = new CustomEvent('write-to-moodle', {
-          detail: {
-            students: students.map(student => ({
-              email: student.email,
-              grade: student.grade,
-              feedback: student.feedback
-            }))
-          }
-        });
-        window.dispatchEvent(event);
-      } else {
-        alert('Please save your changes before submitting.');
+    // Export to CSV and write to Moodle
+    exportForMoodle();
+    
+    // Write grades and feedback to Moodle's interface
+    const event = new CustomEvent('write-to-moodle', {
+      detail: {
+        students: students.map(student => ({
+          email: student.email,
+          grade: student.grade,
+          feedback: student.feedback
+        }))
       }
     });
+    window.dispatchEvent(event);
   };
 
   // Add storeFileHandle function

@@ -317,33 +317,54 @@ window.addEventListener('message', function(event) {
 
 function writeGradesToMoodle(students) {
   const rows = document.querySelectorAll('table.generaltable tbody tr');
+  let updatedCount = 0;
   
   rows.forEach(row => {
-    // Get the email cell from the row
-    const emailCell = row.querySelector('td:nth-child(4)');
-    if (!emailCell) return;
+    // Find email in the row
+    const cells = row.querySelectorAll('td');
+    let studentEmail = '';
     
-    const email = emailCell.textContent.trim();
-    const student = students.find(s => s.email === email);
-    
-    if (student) {
-      // Find the grade input
-      const gradeInput = row.querySelector('input[name^="grade"]');
-      if (gradeInput) {
-        gradeInput.value = student.grade;
-        // Trigger change event
-        gradeInput.dispatchEvent(new Event('change', { bubbles: true }));
-      }
-      
-      // Find the feedback textarea
-      const feedbackTextarea = row.querySelector('textarea[name^="feedback"]');
-      if (feedbackTextarea) {
-        feedbackTextarea.value = student.feedback;
-        // Trigger change event
-        feedbackTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+    // Look for email in all cells
+    for (const cell of cells) {
+      const text = cell.textContent.trim();
+      if (text.includes('@bobeldyk.us') || text.includes('@calvin.edu')) {
+        studentEmail = text;
+        break;
       }
     }
+    
+    if (!studentEmail) return;
+    
+    const student = students.find(s => s.email === studentEmail);
+    if (!student) return;
+    
+    // Find the grade input (looking for quickgrade input)
+    const gradeInput = row.querySelector('input[id*="quickgrade"]');
+    if (gradeInput && student.grade) {
+      gradeInput.value = student.grade;
+      gradeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      updatedCount++;
+    }
+    
+    // Find the feedback textarea (looking for quickgrade textarea)
+    const feedbackTextarea = row.querySelector('textarea[id*="quickgrade"]');
+    if (feedbackTextarea && student.feedback) {
+      feedbackTextarea.value = student.feedback;
+      feedbackTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+      updatedCount++;
+    }
   });
+
+  // If any updates were made, try to click the save changes button
+  if (updatedCount > 0) {
+    const saveButton = document.querySelector('input[name="savechanges"]');
+    if (saveButton) {
+      // Optional: Scroll the save button into view
+      saveButton.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Alert the user that they need to save changes
+      alert('Grades and feedback have been filled in. Please review and click "Save changes" to submit.');
+    }
+  }
 }
 
 // Add event listener for the custom event
