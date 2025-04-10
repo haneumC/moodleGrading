@@ -62,7 +62,6 @@ const StudentList: React.FC<{
   setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
   onLastAutoSaveTimeUpdate: (time: string) => void;
   selectedFeedbackId: number | null;
-  onSaveData: (showStatus: boolean, isAuto: boolean) => Promise<boolean>;
   onFileHandleCreated: (handle: FileSystemFileHandle) => void;
 }> = ({
   students,
@@ -76,7 +75,6 @@ const StudentList: React.FC<{
   setFeedbackItems,
   onLastAutoSaveTimeUpdate,
   selectedFeedbackId,
-  onSaveData,
   onFileHandleCreated
 }) => {
   console.log('StudentList received students:', students);
@@ -122,7 +120,7 @@ const StudentList: React.FC<{
   const [fileLoadedNoAutoSave, setFileLoadedNoAutoSave] = useState(false);
 
   // Move this ref outside of the useEffect
-  const currentDataRef = useRef<string>('');
+  // Remove unused currentDataRef
 
   // Add a keyboard shortcut to toggle the debug panel
   useEffect(() => {
@@ -209,27 +207,6 @@ const StudentList: React.FC<{
       delete window.markGradingChanges;
     };
   }, [markChanges]);
-
-  // Add this function to check and request file permissions
-  const verifyFilePermissions = async () => {
-    if (!fileHandle) return false;
-    
-    try {
-      // Check if we have permission to write to the file
-      const permission = await fileHandle.queryPermission({ mode: 'readwrite' });
-      
-      if (permission !== 'granted') {
-        // Request permission
-        const newPermission = await fileHandle.requestPermission({ mode: 'readwrite' });
-        return newPermission === 'granted';
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Error checking file permissions:', err);
-      return false;
-    }
-  };
 
   // Replace the auto-save interval with a cleaner version
   useEffect(() => {
@@ -362,52 +339,26 @@ const StudentList: React.FC<{
   useEffect(() => {
     const restoreFileHandle = async () => {
       try {
-        const handle = await retrieveFileHandle();
-        
-        if (handle) {
-          // Check if we still have permission to access the file
-          const permission = await handle.queryPermission({ mode: 'readwrite' });
-          
-          if (permission === 'granted') {
-            console.log('Restored file handle with permission');
-            setFileHandle(handle);
-            onFileHandleCreated(handle);
-            
-            // Update the auto-save status
-            setAutoSaveStatus('Auto-save enabled');
-            setShowAutoSaveStatus(true);
-            setTimeout(() => {
-              setShowAutoSaveStatus(false);
-            }, 3000);
-          } else {
-            // We need to request permission
-            const newPermission = await handle.requestPermission({ mode: 'readwrite' });
-            
-            if (newPermission === 'granted') {
-              console.log('Restored file handle after requesting permission');
-              setFileHandle(handle);
-              onFileHandleCreated(handle);
-              
-              // Update the auto-save status
-              setAutoSaveStatus('Auto-save enabled');
-              setShowAutoSaveStatus(true);
-              setTimeout(() => {
-                setShowAutoSaveStatus(false);
-              }, 3000);
-            } else {
-              console.log('Permission denied for restored file handle');
-              setAutoSaveStatus('Auto-save permission denied. Please save manually.');
-              setShowAutoSaveStatus(true);
-              setTimeout(() => {
-                setShowAutoSaveStatus(false);
-              }, 5000);
-            }
-          }
-        } else {
-          console.log('No file handle found in storage');
+        const savedFileName = localStorage.getItem('lastSaveFileName');
+        if (!savedFileName) {
+          throw new Error('No saved file name found');
         }
-      } catch (err) {
-        console.error('Error restoring file handle:', err);
+
+        // Request user to select the file again
+        const handle = await window.showOpenFilePicker({
+          types: [{
+            description: 'JSON Files',
+            accept: {
+              'application/json': ['.json']
+            }
+          }]
+        }).then(handles => handles[0]);
+
+        await storeFileHandle(handle);
+        return handle;
+      } catch (error) {
+        console.error('Error restoring file handle:', error);
+        throw error;
       }
     };
     
@@ -834,6 +785,19 @@ const StudentList: React.FC<{
         alert('Please save your changes before submitting.');
       }
     });
+  };
+
+  // Add storeFileHandle function
+  const storeFileHandle = async (handle: FileSystemFileHandle) => {
+    try {
+      setFileHandle(handle);
+      onFileHandleCreated(handle);
+      // Store any additional metadata if needed
+      localStorage.setItem('lastSaveFileName', 'savedProgress.json');
+    } catch (error) {
+      console.error('Error storing file handle:', error);
+      throw error;
+    }
   };
 
   return (

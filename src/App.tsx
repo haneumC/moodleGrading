@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import './App.css';
 import Feedback from './components/Feedback/Feedback';
 import StudentList from './components/StudentList/StudentList';
@@ -6,7 +6,6 @@ import { HashRouter as Router, Route, Routes, useNavigate } from 'react-router-d
 import AboutPage from './components/About/About';
 import { Student, ChangeRecord, FeedbackItem } from '@/components/StudentList/types';
 import ChangeHistoryPanel from './components/StudentList/components/ChangeHistoryPanel';
-import { saveAs } from 'file-saver';
 
 const MAX_CHANGES = 50;
 const SAVE_HANDLE_KEY = 'save_handle_id';
@@ -87,7 +86,6 @@ const MainApp = () => {
   
   const [changeHistory, setChangeHistory] = useState<ChangeRecord[]>([]);
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
-  const [savedFileHandle, setSavedFileHandle] = useState<FileSystemFileHandle | null>(null);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<number | null>(null);
 
@@ -147,7 +145,6 @@ const MainApp = () => {
         try {
           const handle = await root.getFileHandle(handleId);
           if (handle) {
-            setSavedFileHandle(handle);
             console.log('File handle restored successfully');
           }
         } catch (err) {
@@ -198,32 +195,25 @@ const MainApp = () => {
     if (!change.studentName) return;
 
     // Revert the student's state
-    setStudents(prevStudents =>
-      prevStudents.map(student => {
-        if (student.name === change.studentName) {
-          if (change.type === 'grade') {
-            return { ...student, grade: change.oldValue as string };
-          } else if (change.type === 'feedback') {
-            const oldValue = change.oldValue as { grade: string; feedback: string; appliedIds: number[] };
-            return {
-              ...student,
-              grade: oldValue.grade,
-              feedback: oldValue.feedback,
-              appliedIds: oldValue.appliedIds
-            };
-          }
+    setStudents(prev => prev.map(student => {
+      if (student.name === change.studentName) {
+        if (change.type === 'grade') {
+          return { ...student, grade: change.oldValue as string };
+        } else if (change.type === 'feedback') {
+          const oldValue = change.oldValue as { grade: string; feedback: string; appliedIds: number[] };
+          return { 
+            ...student, 
+            grade: oldValue.grade,
+            feedback: oldValue.feedback,
+            appliedIds: oldValue.appliedIds
+          };
         }
-        return student;
-      })
-    );
+      }
+      return student;
+    }));
 
-    // Only remove the specific change from history
-    setChangeHistory(prev => 
-      prev.filter(c => 
-        !(c.timestamp === change.timestamp && 
-          c.studentName === change.studentName)
-      )
-    );
+    // Remove the change from history
+    setChangeHistory(prev => prev.filter(c => c !== change));
   };
 
   const handleFeedbackEdit = (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => {
@@ -266,127 +256,6 @@ const MainApp = () => {
     );
   };
 
-  // First, define handleLastAutoSaveTimeUpdate before saveData
-  const handleLastAutoSaveTimeUpdate = (time: string) => {
-    console.log(`Received last auto-save time in App: ${time}`);
-    setLastAutoSaveTime(time);
-  };
-
-  // Then define saveData which uses handleLastAutoSaveTimeUpdate
-  const saveData = useCallback(async (showStatus: boolean = false, _isAuto: boolean = false) => {
-    console.log(`saveData called with showStatus=${showStatus}, isAuto=${_isAuto}`);
-    
-    try {
-      const saveData = {
-        students,
-        assignmentName,
-        timestamp: new Date().toISOString(),
-        feedbackItems
-      };
-      const jsonString = JSON.stringify(saveData, null, 2);
-      console.log('Preparing to save data:', {
-        studentsCount: students.length,
-        feedbackItemsCount: feedbackItems.length,
-        dataSize: jsonString.length
-      });
-
-      if (!savedFileHandle) {
-        // No file handle exists, prompt user to save a new file
-        if ('showSaveFilePicker' in window) {
-          try {
-            const options = {
-              suggestedName: `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`,
-              types: [{
-                description: 'JSON Files',
-                accept: { 'application/json': ['.json'] },
-              }],
-            };
-
-            const handle = await window.showSaveFilePicker(options);
-            setSavedFileHandle(handle);
-            localStorage.setItem(SAVE_HANDLE_KEY, handle.name);
-
-            const writable = await handle.createWritable();
-            await writable.write(jsonString);
-            await writable.close();
-            console.log('Data saved to new file');
-            
-            // Update last auto-save time
-            const timeString = new Date().toLocaleTimeString();
-            handleLastAutoSaveTimeUpdate(timeString);
-          } catch (err) {
-            if (err instanceof Error && err.name === 'AbortError') {
-              console.log('Save operation was cancelled by the user.');
-              return false; // Exit if the user cancels the save dialog
-            } else {
-              console.error('Save error:', err);
-              return false;
-            }
-          }
-        } else {
-          // Fallback for browsers without File System API
-          try {
-            const blob = new Blob([jsonString], { type: 'application/json' });
-            saveAs(blob, `${assignmentName.toLowerCase().replace(/\s+/g, '_')}_progress.json`);
-          } catch (err) {
-            console.error('Error saving file:', err);
-            return false;
-          }
-        }
-      } else {
-        // File handle exists, save to the existing file
-        try {
-          console.log(`Attempting to save to existing file: ${savedFileHandle.name}`);
-          
-          // Check if we have permission to write to the file
-          const permissionStatus = await savedFileHandle.queryPermission({ mode: 'readwrite' });
-          console.log(`File permission status: ${permissionStatus}`);
-          
-          if (permissionStatus !== 'granted') {
-            console.log('Requesting permission to write to file...');
-            const newPermissionStatus = await savedFileHandle.requestPermission({ mode: 'readwrite' });
-            console.log(`New permission status: ${newPermissionStatus}`);
-            
-            if (newPermissionStatus !== 'granted') {
-              console.error('Permission to write to file was denied');
-              return false;
-            }
-          }
-          
-          console.log('Creating writable stream...');
-          const writable = await savedFileHandle.createWritable();
-          
-          console.log(`Writing ${jsonString.length} bytes to file...`);
-          await writable.write(jsonString);
-          
-          console.log('Closing writable stream...');
-          await writable.close();
-          
-          console.log('✅ File write completed successfully');
-          
-          // Update last auto-save time
-          const timeString = new Date().toLocaleTimeString();
-          handleLastAutoSaveTimeUpdate(timeString);
-        } catch (err) {
-          console.error('Error saving to existing file:', err);
-          // If permission was revoked or file is no longer accessible
-          setSavedFileHandle(null);
-          localStorage.removeItem(SAVE_HANDLE_KEY);
-          return false;
-        }
-      }
-
-      if (showStatus) {
-        console.log('Data saved successfully');
-      }
-      
-      return true;
-    } catch (err) {
-      console.error('Save error:', err);
-      return false;
-    }
-  }, [students, feedbackItems, assignmentName, savedFileHandle, handleLastAutoSaveTimeUpdate]);
-
   // Function to handle feedback selection
   const handleFeedbackSelect = (feedbackId: number | null) => {
     console.log('App received feedback selection:', feedbackId);
@@ -407,14 +276,6 @@ const MainApp = () => {
       console.log('Selecting feedback:', feedbackId);
       setSelectedFeedbackId(feedbackId);
     }
-  };
-
-  const handleFileHandleCreated = (handle: FileSystemFileHandle) => {
-    console.log('Received file handle in App component:', handle);
-    setSavedFileHandle(handle);
-    
-    // Store a reference to indicate we have a file handle
-    localStorage.setItem('hasFileHandle', 'true');
   };
 
   return (
@@ -490,13 +351,14 @@ const MainApp = () => {
             onStudentSelect={setSelectedStudent}
             assignmentName={assignmentName}
             setAssignmentName={setAssignmentName}
+            onChangeTracked={handleChangeTracked}
             feedbackItems={feedbackItems}
             setFeedbackItems={setFeedbackItems}
-            onChangeTracked={handleChangeTracked}
-            onLastAutoSaveTimeUpdate={handleLastAutoSaveTimeUpdate}
+            onLastAutoSaveTimeUpdate={setLastAutoSaveTime}
             selectedFeedbackId={selectedFeedbackId}
-            onSaveData={saveData}
-            onFileHandleCreated={handleFileHandleCreated}
+            onFileHandleCreated={(handle) => {
+              console.log('File handle created:', handle);
+            }}
           />
         </div>
       </main>
