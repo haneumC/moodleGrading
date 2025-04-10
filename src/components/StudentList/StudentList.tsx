@@ -490,6 +490,18 @@ const StudentList: React.FC<{
     }
   };
 
+  const handleSubmit = () => {
+    // Save progress first
+    handleSaveProgress(false).then((success) => {
+      if (success) {
+        // Close the current window/tab
+        window.close();
+      } else {
+        alert('Please save your changes before submitting.');
+      }
+    });
+  };
+
   return (
     <div className="layout">
       <div className="listSection">
@@ -498,6 +510,7 @@ const StudentList: React.FC<{
           onExport={exportForMoodle}
           onSaveProgress={handleSaveProgress}
           onLoadProgress={handleLoadProgress}
+          onSubmit={handleSubmit}
           error={error}
           autoSaveStatus={autoSaveStatus}
           showAutoSaveStatus={showAutoSaveStatus}

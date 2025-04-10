@@ -7,6 +7,7 @@ interface FileControlsProps {
   onExport: () => void;
   onSaveProgress: () => Promise<boolean | void>;
   onLoadProgress: (e: React.ChangeEvent<HTMLInputElement>, options?: { loadStudents: boolean; loadFeedback: boolean }) => void;
+  onSubmit?: () => void;
   error: string;
   autoSaveStatus: string;
   showAutoSaveStatus: boolean;
@@ -24,6 +25,7 @@ const FileControls: React.FC<FileControlsProps> = ({
   onExport, 
   onSaveProgress,
   onLoadProgress,
+  onSubmit,
   error,
   autoSaveStatus,
   showAutoSaveStatus,
@@ -116,6 +118,18 @@ const FileControls: React.FC<FileControlsProps> = ({
               style={{ cursor: 'pointer' }}
             >
               Load Progress
+            </button>
+            <button
+              className="studentBtn"
+              onClick={onSubmit}
+              disabled={!hasData}
+              style={{ 
+                cursor: hasData ? 'pointer' : 'not-allowed',
+                opacity: hasData ? 1 : 0.5,
+                marginLeft: '10px'
+              }}
+            >
+              Submit
             </button>
             {showLoadOptions && (
               <div className="load-options">
