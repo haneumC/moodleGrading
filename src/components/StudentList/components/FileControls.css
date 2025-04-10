@@ -5,20 +5,25 @@
 
 .buttons {
   display: flex;
-  gap: 15px;
+  gap: 10px;
   margin-bottom: 0.75rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .studentBtn,
 .import-file-label {
-  min-width: 160px;
-  padding: 0.75rem 1.25rem;
+  padding: 0.75rem 1rem;
   font-size: 0.95rem;
   height: 45px;
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+}
+
+.import-file-label {
+  min-width: 200px;
 }
 
 .button-like,
