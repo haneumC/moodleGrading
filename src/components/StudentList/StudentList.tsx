@@ -766,20 +766,27 @@ const StudentList: React.FC<{
       return;
     }
     
-    // Export to CSV and write to Moodle
+    // Export to CSV
     exportForMoodle();
     
-    // Write grades and feedback to Moodle's interface
-    const event = new CustomEvent('write-to-moodle', {
-      detail: {
-        students: students.map(student => ({
-          email: student.email,
-          grade: student.grade,
-          feedback: student.feedback
-        }))
-      }
-    });
-    window.dispatchEvent(event);
+    // Send data to Moodle page using postMessage
+    if (window.opener) {
+      window.opener.postMessage({
+        type: 'WRITE_GRADES',
+        data: {
+          students: students.map(student => ({
+            email: student.email,
+            grade: student.grade,
+            feedback: student.feedback
+          }))
+        }
+      }, '*');  // Using * for now, but you might want to restrict this to your Moodle domain
+      
+      // Alert user that grades are being filled
+      alert('Grades and feedback are being filled in the Moodle page. Please check the Moodle window.');
+    } else {
+      alert('Cannot find Moodle page. Please make sure you opened this from the Moodle grading page.');
+    }
   };
 
   // Add storeFileHandle function

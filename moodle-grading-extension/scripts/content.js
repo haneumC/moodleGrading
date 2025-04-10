@@ -293,29 +293,15 @@ function applyGradesToMoodle(data) {
 
 // Listen for messages from the React app
 window.addEventListener('message', function(event) {
-  // Verify the origin
-  if (event.origin !== 'https://haneumc.github.io') return;
-  
-  if (event.data.type === 'APPLY_GRADES') {
-    try {
-      const appliedCount = applyGradesToMoodle(event.data.data);
-      // Send response back
-      event.source.postMessage({
-        type: 'GRADES_APPLIED',
-        success: true,
-        count: appliedCount
-      }, event.origin);
-    } catch (error) {
-      event.source.postMessage({
-        type: 'GRADES_APPLIED',
-        success: false,
-        error: error.message
-      }, event.origin);
-    }
+  // Accept messages from the React app
+  if (event.data.type === 'WRITE_GRADES') {
+    console.log('Received grades to write:', event.data);
+    writeGradesToMoodle(event.data.data.students);
   }
 });
 
 function writeGradesToMoodle(students) {
+  console.log('Writing grades for students:', students);
   const rows = document.querySelectorAll('table.generaltable tbody tr');
   let updatedCount = 0;
   
@@ -333,27 +319,35 @@ function writeGradesToMoodle(students) {
       }
     }
     
+    console.log('Found student email:', studentEmail);
     if (!studentEmail) return;
     
     const student = students.find(s => s.email === studentEmail);
+    console.log('Matching student data:', student);
     if (!student) return;
     
     // Find the grade input (looking for quickgrade input)
     const gradeInput = row.querySelector('input[id*="quickgrade"]');
     if (gradeInput && student.grade) {
+      console.log('Setting grade for', studentEmail, ':', student.grade);
       gradeInput.value = student.grade;
       gradeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      gradeInput.dispatchEvent(new Event('input', { bubbles: true }));
       updatedCount++;
     }
     
     // Find the feedback textarea (looking for quickgrade textarea)
     const feedbackTextarea = row.querySelector('textarea[id*="quickgrade"]');
     if (feedbackTextarea && student.feedback) {
+      console.log('Setting feedback for', studentEmail, ':', student.feedback);
       feedbackTextarea.value = student.feedback;
       feedbackTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+      feedbackTextarea.dispatchEvent(new Event('input', { bubbles: true }));
       updatedCount++;
     }
   });
+
+  console.log('Updated', updatedCount, 'fields');
 
   // If any updates were made, try to click the save changes button
   if (updatedCount > 0) {
@@ -364,6 +358,8 @@ function writeGradesToMoodle(students) {
       // Alert the user that they need to save changes
       alert('Grades and feedback have been filled in. Please review and click "Save changes" to submit.');
     }
+  } else {
+    alert('No matching students found to update. Please check if the emails match exactly.');
   }
 }
 
