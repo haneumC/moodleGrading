@@ -1,11 +1,24 @@
 .controls-container {
   margin-bottom: 1rem;
+  padding: 0.5rem;
 }
 
 .buttons {
   display: flex;
-  gap: 10px;
-  margin-bottom: 0.5rem;
+  gap: 15px;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.studentBtn,
+.import-file-label {
+  min-width: 160px;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.95rem;
+  height: 45px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .button-like,
@@ -135,6 +148,8 @@
 
 .load-progress-container {
   position: relative;
+  display: flex;
+  gap: 15px;
 }
 
 .load-options {
