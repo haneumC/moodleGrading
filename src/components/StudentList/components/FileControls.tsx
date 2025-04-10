@@ -34,7 +34,6 @@ const FileControls: React.FC<FileControlsProps> = ({
   isGradingComplete,
   isSaving,
   fileHandle,
-  isNewImport,
   fileLoadedNoAutoSave,
   onEnableAutoSave
 }) => {
