@@ -233,7 +233,12 @@ const MainApp = () => {
           // Replace old feedback text with new one
           const updatedFeedback = student.feedback
             .split('\n\n')
-            .map(line => line.trim() === oldFeedback.comment.trim() ? newFeedback.comment : line)
+            .map(line => {
+              if (line.trim().startsWith(`${oldFeedback.grade}: ${oldFeedback.comment.trim()}`)) {
+                return `${newFeedback.grade}: ${newFeedback.comment.trim()}`;
+              }
+              return line;
+            })
             .join('\n\n');
 
           // Recalculate grade

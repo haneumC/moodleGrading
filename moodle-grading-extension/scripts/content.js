@@ -9,113 +9,133 @@ function isGradingPage() {
 function collectGradingData() {
   const data = {
     assignmentName: '',
-    students: []
+    studentData: []
   };
 
-  // Debug the page structure
-  console.log('Starting data collection...');
-
-  // Get assignment name from the page
-  const assignmentTitle = document.querySelector('.page-header-headings h1, h2');
-  console.log('Found title element:', assignmentTitle);
+  // Get assignment name
+  const assignmentTitle = document.querySelector('.page-header-headings h1');
   if (assignmentTitle) {
     data.assignmentName = assignmentTitle.textContent.trim();
   }
 
-  // Find the table - be more specific with the selector
-  const table = document.querySelector('table.generaltable');
-  console.log('Found table:', table);
-  if (!table) {
-    console.error('Could not find the grading table');
-    return data;
+  // Get all student rows
+  const rows = document.querySelectorAll('table.generaltable > tbody > tr');
+  rows.forEach(row => {
+    try {
+      // Get name from first cell
+      const nameCell = row.querySelector('td');
+      if (!nameCell) return;
+      
+      const nameText = nameCell.textContent.trim().replace('Select', '').trim();
+      if (!nameText) return;
+
+      // Get email
+      let emailText = '';
+      const cells = row.querySelectorAll('td');
+      for (const cell of cells) {
+        const text = cell.textContent.trim();
+        if (text.includes('@bobeldyk.us') || text.includes('@calvin.edu')) {
+          emailText = text;
+          break;
+        }
+      }
+
+      // Get grade and feedback
+      let gradeText = '';
+      let feedbackText = '';
+
+      // Look for grade input
+      const gradeInput = row.querySelector('input[id*="quickgrade"]');
+      if (gradeInput) {
+        gradeText = gradeInput.value || '';
+      }
+
+      // Look for feedback textarea
+      const feedbackArea = row.querySelector('textarea[id*="quickgrade"]');
+      if (feedbackArea) {
+        feedbackText = feedbackArea.value || '';
+      }
+
+      // Add to data if we have at least a name
+      if (nameText) {
+        data.studentData.push({
+          name: nameText,
+          email: emailText,
+          grade: gradeText,
+          feedback: feedbackText,
+          appliedIds: []
+        });
+      }
+    } catch (err) {
+      console.error('Error processing row:', err);
+    }
+  });
+
+  return data;
+}
+
+// Function to add the button to the page
+function addGradingButton() {
+  // Check if button already exists
+  if (document.querySelector('.moodle-grading-btn')) {
+    return;
   }
 
-  // Get column indices from table headers
-  const columnMap = {};
-  const headers = table.querySelectorAll('thead th');
-  console.log('Found headers:', headers);
+  // Create the button
+  const btn = document.createElement('button');
+  btn.textContent = 'Open Moodle Grading';
+  btn.className = 'btn btn-primary moodle-grading-btn';
+  btn.style.cssText = `
+    margin-left: 10px;
+    background-color: #0f6cbf;
+    border: none;
+    padding: 7px 12px;
+    border-radius: 4px;
+    color: white;
+    cursor: pointer;
+    display: inline-block;
+  `;
 
-  headers.forEach((header, index) => {
-    const headerText = header.textContent.trim();
-    console.log('Header text:', headerText, 'at index:', index);
-
-    // Map column indices based on header text
-    if (headerText.includes('name')) {
-      columnMap.name = index;
-    }
-    if (headerText.includes('Email')) {
-      columnMap.email = index;
-    }
-    if (headerText.includes('Status')) {
-      columnMap.status = index;
-    }
-    if (headerText === 'Grade') {
-      columnMap.grade = index;
-    }
-    if (headerText.includes('Last modified')) {
-      columnMap.lastModified = index;
-    }
-    if (headerText.includes('Feedback')) {
-      columnMap.feedback = index;
-    }
-    if (headerText.includes('ID')) {
-      columnMap.idNumber = index;
+  // Add click handler
+  btn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    try {
+      const data = collectGradingData();
+      if (!data.studentData.length) {
+        alert('No student data found.');
+        return;
+      }
+      // Only encode the data when creating the URL
+      const encodedData = encodeURIComponent(JSON.stringify(data));
+      window.open(`https://haneumc.github.io/moodleGrading/?data=${encodedData}`, '_blank');
+    } catch (error) {
+      console.error('Error:', error);
+      alert('Error collecting data. Please check the console for details.');
     }
   });
 
-  console.log('Column mapping:', columnMap);
+  // Find the grading action dropdown
+  const gradingDropdown = document.querySelector('select[name="jump"]');
+  if (gradingDropdown) {
+    // Insert the button right after the dropdown
+    gradingDropdown.insertAdjacentElement('afterend', btn);
+    return;
+  }
 
-  // Get all student rows
-  const rows = table.querySelectorAll('tbody tr');
-  console.log('Found rows:', rows.length);
+  // Fallback - add to the top of the grading table
+  const gradingTable = document.querySelector('.generaltable');
+  if (gradingTable) {
+    gradingTable.parentElement.insertBefore(btn, gradingTable);
+  }
+}
 
-  rows.forEach((row, rowIndex) => {
-    const cells = row.querySelectorAll('td');
-    console.log(`Processing row ${rowIndex}, found cells:`, cells.length);
-
-    if (cells.length > 0) {
-      // Get the name from the "First name / Last name" column
-      let fullName = '';
-      const nameCell = cells[columnMap.name];
-      if (nameCell) {
-        // Try to get the text content, excluding any hidden elements
-        const visibleText = Array.from(nameCell.childNodes)
-          .filter(node => node.nodeType === Node.TEXT_NODE || 
-                         (node.nodeType === Node.ELEMENT_NODE && 
-                          !node.classList.contains('accesshide')))
-          .map(node => node.textContent.trim())
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        fullName = visibleText;
-      }
-
-      const studentData = {
-        name: fullName,
-        email: cells[columnMap.email]?.textContent.trim() || '',
-        idNumber: cells[columnMap.idNumber]?.textContent.trim() || '',
-        status: cells[columnMap.status]?.textContent.trim() || '',
-        grade: cells[columnMap.grade]?.textContent.trim() || '',
-        lastModifiedSubmission: cells[columnMap.lastModified]?.textContent.trim() || '',
-        feedback: cells[columnMap.feedback]?.textContent.trim() || '',
-        appliedIds: []
-      };
-
-      // Clean up the data
-      if (studentData.grade === '-') studentData.grade = '';
-      if (studentData.feedback === '-') studentData.feedback = '';
-
-      console.log('Extracted student data:', studentData);
-
-      // Only add if we have a valid name
-      if (studentData.name && studentData.name !== 'Select') {
-        data.students.push(studentData);
-      }
-    }
-  });
-
-  console.log('Final collected data:', data);
-  return data;
+// Initialize when the page is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', addGradingButton);
+} else {
+  addGradingButton();
 }
 
 // Function to create and style the button
@@ -154,7 +174,7 @@ function launchGradingAssistant() {
     const data = collectGradingData();
     console.log('Raw collected data:', data);
     
-    if (!data.students.length) {
+    if (!data.studentData.length) {
       console.error('No student data was collected');
       alert('Unable to collect student data. Please check if you are on the correct page.');
       return;
@@ -162,23 +182,19 @@ function launchGradingAssistant() {
 
     const storageData = {
       assignmentName: data.assignmentName,
-      students: data.students.map(student => ({
+      students: data.studentData.map(student => ({
         name: student.name,
         email: student.email,
-        status: student.status,
         grade: student.grade || '',
-        lastModifiedSubmission: student.lastModifiedSubmission || '',
         feedback: student.feedback || '',
         appliedIds: []
       })),
       timestamp: new Date().toISOString()
     };
 
-    // Store data in chrome.storage.local
-    chrome.storage.local.set({ moodleGradingData: storageData }, () => {
-      // Open in a new tab after data is stored
-      window.open(chrome.runtime.getURL('build/index.html'), '_blank');
-    });
+    // Use URL parameters instead of Chrome storage
+    const encodedData = encodeURIComponent(JSON.stringify(storageData));
+    window.open(`${chrome.runtime.getURL('build/index.html')}?data=${encodedData}`, '_blank');
 
   } catch (error) {
     console.error('Error launching grading assistant:', error);
@@ -199,12 +215,7 @@ function init() {
   const dropdown = document.querySelector('select[name="jump"]');
   
   if (dropdown) {
-    const button = createGradingButton();
-    // Add some margin to separate from the dropdown
-    button.style.marginLeft = '10px';
-    button.style.display = 'inline-block';
-    // Insert the button after the dropdown
-    dropdown.insertAdjacentElement('afterend', button);
+    addGradingButton();  // Use the working button implementation
     console.log('Button added successfully');
   } else {
     console.error('Could not find dropdown element');

@@ -275,7 +275,7 @@ const Feedback: React.FC<FeedbackProps> = ({
             // Remove the feedback
             const feedbackLines = student.feedback
               .split('\n\n')
-              .filter(line => line.trim() !== feedbackItem.comment.trim())
+              .filter(line => !line.trim().startsWith(`${feedbackItem.grade}: ${feedbackItem.comment.trim()}`))
               .filter(line => line.trim() !== '')
               .join('\n\n');
 
@@ -302,9 +302,10 @@ const Feedback: React.FC<FeedbackProps> = ({
             // Apply the feedback
             const newAppliedIds = [...currentAppliedIds, feedbackItem.id];
             const newGrade = (20 - feedbackItem.grade).toString();
+            const formattedFeedback = `${feedbackItem.grade}: ${feedbackItem.comment.trim()}`;
             const newFeedback = student.feedback
-              ? `${student.feedback.trim()}\n\n${feedbackItem.comment.trim()}`
-              : feedbackItem.comment.trim();
+              ? `${student.feedback.trim()}\n\n${formattedFeedback}`
+              : formattedFeedback;
 
             const newState = {
               ...student,
@@ -400,6 +401,56 @@ const Feedback: React.FC<FeedbackProps> = ({
   };
 
   const handleDeleteFeedback = (id: number) => {
+    // Get the feedback item before deleting it
+    const feedbackToDelete = feedbackItems.find(item => item.id === id);
+    
+    if (feedbackToDelete) {
+      // Update students who have this feedback applied
+      onStudentsUpdate(prevStudents =>
+        prevStudents.map(student => {
+          if (student.appliedIds?.includes(id)) {
+            const oldState = { ...student };
+            
+            // Remove the feedback text with the correct format
+            const feedbackLines = student.feedback
+              .split('\n\n')
+              .filter(line => !line.trim().startsWith(`${feedbackToDelete.grade}: ${feedbackToDelete.comment.trim()}`))
+              .filter(line => line.trim() !== '')
+              .join('\n\n');
+
+            // Remove the id from appliedIds
+            const newAppliedIds = student.appliedIds.filter(appliedId => appliedId !== id);
+            
+            // Recalculate grade based on remaining feedback
+            const remainingDeduction = newAppliedIds.reduce((sum, appliedId) => {
+              const feedback = feedbackItems.find(f => f.id === appliedId);
+              return sum + (feedback?.grade || 0);
+            }, 0);
+            
+            const newState = {
+              ...student,
+              grade: newAppliedIds.length === 0 ? "" : (20 - remainingDeduction).toString(),
+              feedback: feedbackLines || "",
+              appliedIds: newAppliedIds,
+            };
+
+            // Track the change
+            onChangeTracked({
+              type: 'feedback',
+              studentName: student.name,
+              oldValue: oldState,
+              newValue: newState,
+              timestamp: new Date().toISOString()
+            });
+
+            return newState;
+          }
+          return student;
+        })
+      );
+    }
+
+    // Now remove the feedback item itself
     setReusableIds(prev => [...prev, id]);
     setFeedbackItems(feedbackItems.filter(item => item.id !== id));
   };

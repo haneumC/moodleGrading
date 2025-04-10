@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Table } from "@/components/ui/table";
-import { Student, SaveData, ChangeRecord } from './types';
+import { Student, SaveData, ChangeRecord, FeedbackItem } from './types';
 import TableHeaderComponent from './components/TableHeader';
 import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
@@ -58,8 +58,8 @@ const StudentList: React.FC<{
   assignmentName: string;
   setAssignmentName: React.Dispatch<React.SetStateAction<string>>;
   onChangeTracked: (change: ChangeRecord) => void;
-  feedbackItems: any[];
-  setFeedbackItems: React.Dispatch<React.SetStateAction<any[]>>;
+  feedbackItems: FeedbackItem[];
+  setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
   onLastAutoSaveTimeUpdate: (time: string) => void;
   selectedFeedbackId: number | null;
   onSaveData: (showStatus: boolean, isAuto: boolean) => Promise<boolean>;
@@ -117,9 +117,6 @@ const StudentList: React.FC<{
 
   // Add this state
   const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  // Add this state variable to track the last auto-save time
-  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
 
   // Add a state to track if a file is loaded but auto-save isn't enabled yet
   const [fileLoadedNoAutoSave, setFileLoadedNoAutoSave] = useState(false);
@@ -289,7 +286,6 @@ const StudentList: React.FC<{
           
           // Update the UI
           const timeString = new Date().toLocaleTimeString();
-          setLastAutoSaveTime(timeString);
           onLastAutoSaveTimeUpdate(timeString);
           
           // Show a success message
@@ -508,7 +504,6 @@ const StudentList: React.FC<{
         
         // Update the UI
         const timeString = new Date().toLocaleTimeString();
-        setLastAutoSaveTime(timeString);
         onLastAutoSaveTimeUpdate(timeString);
         
         // Show a success message
@@ -566,7 +561,6 @@ const StudentList: React.FC<{
         
         // Update the UI
         const timeString = new Date().toLocaleTimeString();
-        setLastAutoSaveTime(timeString);
         onLastAutoSaveTimeUpdate(timeString);
         
         // Show a success message
@@ -585,14 +579,25 @@ const StudentList: React.FC<{
   };
 
   // Handle loading progress from a file
-  const handleLoadProgress = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLoadProgress = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    options?: { loadStudents: boolean; loadFeedback: boolean }
+  ) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Default to loading both if no options provided
+    const loadOptions = {
+      loadStudents: true,
+      loadFeedback: true,
+      ...options
+    };
 
     // Check if this is a JSON file (previously saved progress)
     const isProgressFile = file.name.endsWith('.json');
     
     const reader = new FileReader();
+    
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
@@ -601,19 +606,22 @@ const StudentList: React.FC<{
         if (isProgressFile) {
           const data = JSON.parse(content) as SaveData;
           
-          setStudents(data.students);
-          setAssignmentName(data.assignmentName);
-          if (Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
+          // Selectively load students and feedback based on options
+          if (loadOptions.loadStudents) {
+            setStudents(data.students);
+            setAssignmentName(data.assignmentName);
+          }
+          
+          if (loadOptions.loadFeedback && Array.isArray(data.feedbackItems) && data.feedbackItems.length > 0) {
             setFeedbackItems(data.feedbackItems);
           }
           
-          // Update last saved data reference with the LOADED data
-          const loadedData = JSON.stringify({ 
-            students: data.students, 
-            feedbackItems: data.feedbackItems || [] 
+          // Update last saved data reference
+          lastSavedDataRef.current = JSON.stringify({ 
+            students: loadOptions.loadStudents ? data.students : students,
+            feedbackItems: loadOptions.loadFeedback ? data.feedbackItems : feedbackItems
           });
           console.log('Setting lastSavedDataRef from loaded file');
-          lastSavedDataRef.current = loadedData;
           
           // Reset unsaved changes flag
           hasUnsavedChangesRef.current = false;
@@ -623,7 +631,7 @@ const StudentList: React.FC<{
             type: 'import',
             studentName: 'System',
             timestamp: new Date().toISOString(),
-            message: 'Progress data imported',
+            message: `Progress data imported (${loadOptions.loadStudents ? 'students' : ''}${loadOptions.loadStudents && loadOptions.loadFeedback ? ' and ' : ''}${loadOptions.loadFeedback ? 'feedback' : ''})`,
             oldValue: '',
             newValue: ''
           });
@@ -710,7 +718,6 @@ const StudentList: React.FC<{
       
       // Format current time for display
       const timeString = new Date().toLocaleTimeString();
-      setLastAutoSaveTime(timeString);
       onLastAutoSaveTimeUpdate(timeString);
       
       setAutoSaveStatus('Auto-save enabled');
@@ -789,7 +796,6 @@ const StudentList: React.FC<{
       
       // Update the UI
       const timeString = new Date().toLocaleTimeString();
-      setLastAutoSaveTime(timeString);
       onLastAutoSaveTimeUpdate(timeString);
       
       // Show a success message
@@ -804,6 +810,32 @@ const StudentList: React.FC<{
     }
   };
 
+  // Add this function to check if all students have grades and feedback
+  const isGradingComplete = () => {
+    return students.every(student => {
+      const hasGrade = student.grade && student.grade.trim() !== '';
+      const hasFeedback = student.feedback && student.feedback.trim() !== '';
+      return hasGrade && hasFeedback;
+    });
+  };
+
+  const handleSubmit = () => {
+    if (!isGradingComplete()) {
+      alert('Please complete all grades and feedback before submitting.');
+      return;
+    }
+    
+    // Save progress first
+    handleSaveProgress().then((success) => {
+      if (success) {
+        // Close the current window/tab
+        window.close();
+      } else {
+        alert('Please save your changes before submitting.');
+      }
+    });
+  };
+
   return (
     <div className="layout">
       <div className="listSection">
@@ -812,12 +844,14 @@ const StudentList: React.FC<{
           onExport={exportForMoodle}
           onSaveProgress={handleSaveProgress}
           onLoadProgress={handleLoadProgress}
+          onSubmit={handleSubmit}
           error={error}
           autoSaveStatus={autoSaveStatus}
           showAutoSaveStatus={showAutoSaveStatus}
           hasData={students.length > 0}
+          isGradingComplete={isGradingComplete()}
           isSaving={isSaving}
-          fileHandle={fileHandle}
+          fileHandle={fileHandle || undefined}
           isNewImport={isNewImport}
           fileLoadedNoAutoSave={fileLoadedNoAutoSave}
           onEnableAutoSave={handleEnableAutoSave}
