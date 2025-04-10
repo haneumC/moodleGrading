@@ -1,8 +1,6 @@
 .layout {
   display: flex;
   height: 80vh;
-  padding: 20px;
-  height: 100%;
 }
 
 .listSection {
@@ -10,9 +8,6 @@
   background-color: #3d3c3f;
   color: #fff;
   border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
 }
 
 .buttons {
@@ -66,11 +61,8 @@
 }
 
 .table-container {
-  background-color: #2d2d2d;
+  background-color: #3d3c3f;
   border-radius: 8px;
-  padding: 16px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  margin-top: 10px;
   overflow: hidden;
   max-height: 70vh;
 }
@@ -103,51 +95,7 @@
 
 .table-container table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.table-container th {
-  background-color: #383838;
-  padding: 12px;
-  text-align: left;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.table-container td {
-  padding: 12px;
-  border-bottom: 1px solid #383838;
-  color: #ffffff;
-}
-
-.table-container tr:hover {
-  background-color: #383838;
-}
-
-.table-container tr.selected {
-  background-color: #3b82f6;
-}
-
-/* Add styles for the header row */
-.table-container thead tr {
-  border-bottom: 2px solid #4a4a4a;
-}
-
-/* Add styles for the last row */
-.table-container tbody tr:last-child td {
-  border-bottom: none;
-}
-
-/* Add styles for alternating rows */
-.table-container tbody tr:nth-child(even) {
-  background-color: #333333;
-}
-
-/* Add hover effect */
-.table-container tbody tr:hover {
-  background-color: #383838;
-  transition: background-color 0.2s ease;
+  border-collapse: collapse;
 }
 
 .table-container::-webkit-scrollbar {
