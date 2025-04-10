@@ -333,8 +333,10 @@ const Feedback: React.FC<FeedbackProps> = ({
       })
     );
     
-    // We're not triggering auto-save here anymore
-    // The auto-save interval will handle it
+    // Mark that changes have been made
+    if (window.markGradingChanges) {
+      window.markGradingChanges();
+    }
   };
 
   const handleAddFeedback = () => {
@@ -603,16 +605,16 @@ const Feedback: React.FC<FeedbackProps> = ({
             <Textarea
               value={newFeedback.comment}
               onChange={(e) => setNewFeedback({ ...newFeedback, comment: e.target.value })}
-              placeholder="Enter feedback text"
+              placeholder="Enter feedback comment"
+              aria-label="Feedback comment"
               className="bg-[#3a3f4b] border-[#444] text-white min-h-[60px] resize-y"
             />
             <Input
               type="number"
               value={newFeedback.grade}
               onChange={(e) => setNewFeedback({ ...newFeedback, grade: Number(e.target.value) })}
-              placeholder="Deduction"
-              min={0}
-              max={20}
+              placeholder="Enter deduction points"
+              aria-label="Deduction points"
               className="w-[100px] bg-[#3a3f4b] border-[#444] text-white"
             />
             <div className="flex space-x-2">

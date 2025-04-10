@@ -227,9 +227,9 @@ const MainApp = () => {
   };
 
   const handleFeedbackEdit = (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => {
-    setStudents(prevStudents =>
+    setStudents(prevStudents => 
       prevStudents.map(student => {
-        if (student.appliedIds.includes(oldFeedback.id)) {
+        if (Array.isArray(student.appliedIds) && student.appliedIds.includes(oldFeedback.id)) {
           // Replace old feedback text with new one
           const updatedFeedback = student.feedback
             .split('\n\n')
@@ -252,6 +252,9 @@ const MainApp = () => {
 
           const newGrade = Math.max(0, 20 - totalDeduction);
 
+          // Dispatch a custom event to mark unsaved changes
+          window.dispatchEvent(new CustomEvent('grading-change'));
+          
           return {
             ...student,
             feedback: updatedFeedback,
@@ -406,6 +409,14 @@ const MainApp = () => {
     }
   };
 
+  const handleFileHandleCreated = (handle: FileSystemFileHandle) => {
+    console.log('Received file handle in App component:', handle);
+    setSavedFileHandle(handle);
+    
+    // Store a reference to indicate we have a file handle
+    localStorage.setItem('hasFileHandle', 'true');
+  };
+
   return (
     <div className="grading-assistant relative">
       <button 
@@ -485,7 +496,7 @@ const MainApp = () => {
             onLastAutoSaveTimeUpdate={handleLastAutoSaveTimeUpdate}
             selectedFeedbackId={selectedFeedbackId}
             onSaveData={saveData}
-            onFileHandleCreated={(handle) => setSavedFileHandle(handle)}
+            onFileHandleCreated={handleFileHandleCreated}
           />
         </div>
       </main>

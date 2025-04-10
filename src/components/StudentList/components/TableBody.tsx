@@ -6,18 +6,25 @@ import { Student } from '../../StudentList/types';
 interface TableBodyProps {
   rows: Row<Student>[];
   selectedStudent: string | null;
-  onStudentSelect: (studentName: string) => void;
+  onStudentSelect: (student: string) => void;
   selectedFeedbackId: number | null;
+  onStudentModified: () => void;
 }
 
 const TableBodyComponent: React.FC<TableBodyProps> = ({ 
   rows, 
   selectedStudent, 
   onStudentSelect,
-  selectedFeedbackId
+  selectedFeedbackId,
+  onStudentModified
 }) => {
   console.log('TableBody received selectedFeedbackId:', selectedFeedbackId);
   
+  const handleRowClick = (student: Student) => {
+    onStudentSelect(student.name);
+    onStudentModified();
+  };
+
   return (
     <>
       <TableCaption>
@@ -62,7 +69,7 @@ const TableBodyComponent: React.FC<TableBodyProps> = ({
               <TableRow 
                 key={student.name} 
                 className={rowClassName}
-                onClick={() => onStudentSelect(student.name)}
+                onClick={() => handleRowClick(student)}
               >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   ColumnDef,
   SortingState,
@@ -39,6 +39,13 @@ declare global {
       }>;
       suggestedName?: string;
     }) => Promise<FileSystemFileHandle>;
+  }
+}
+
+// Add this at the top of the file, outside the component
+declare global {
+  interface Window {
+    markGradingChanges?: () => void;
   }
 }
 
@@ -114,6 +121,9 @@ const StudentList: React.FC<{
   // Add a state to track if a file is loaded but auto-save isn't enabled yet
   const [fileLoadedNoAutoSave, setFileLoadedNoAutoSave] = useState(false);
 
+  // Move this ref outside of the useEffect
+  const currentDataRef = useRef<string>('');
+
   // Add a keyboard shortcut to toggle the debug panel
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -157,92 +167,142 @@ const StudentList: React.FC<{
     tryRestoreFileHandle();
   }, []);
 
-  // Modify the track changes useEffect to not show indicators
+  // Add more detailed logging to the change detection
   useEffect(() => {
     if (students.length > 0 || feedbackItems.length > 0) {
-      const _currentData = { students, feedbackItems };
+      const currentData = JSON.stringify({ students, feedbackItems });
       
       // Only mark as having unsaved changes if the data is different from last saved data
-      if (JSON.stringify(_currentData) !== lastSavedDataRef.current) {
-        hasUnsavedChangesRef.current = true;
+      if (currentData !== lastSavedDataRef.current && lastSavedDataRef.current !== '') {
+        console.log('Changes detected since last save');
+        console.log('Current data length:', currentData.length);
+        console.log('Last saved data length:', lastSavedDataRef.current.length);
         
-        // We're removing the indicator here - just silently track changes
-        // No more setAutoSaveStatus or setShowAutoSaveStatus
+        // For debugging, log a small sample of the differences
+        if (currentData.length > 100 && lastSavedDataRef.current.length > 100) {
+          console.log('Sample of current data:', currentData.substring(0, 100));
+          console.log('Sample of last saved data:', lastSavedDataRef.current.substring(0, 100));
+        }
+        
+        hasUnsavedChangesRef.current = true;
+      } else if (lastSavedDataRef.current === '') {
+        console.log('No previous saved data to compare against');
+      } else {
+        console.log('No changes detected since last save');
       }
     }
   }, [students, feedbackItems]);
 
-  // Modify the auto-save interval to use onSaveData
+  // First, let's add a function to mark changes when grading happens
+  const markChanges = useCallback(() => {
+    console.log('Grading changes detected');
+    hasUnsavedChangesRef.current = true;
+  }, []);
+
+  // Add this to expose the function globally
   useEffect(() => {
+    // Create a global function to mark changes
+    window.markGradingChanges = markChanges;
+    
+    return () => {
+      // Clean up
+      delete window.markGradingChanges;
+    };
+  }, [markChanges]);
+
+  // Add this function to check and request file permissions
+  const verifyFilePermissions = async () => {
+    if (!fileHandle) return false;
+    
+    try {
+      // Check if we have permission to write to the file
+      const permission = await fileHandle.queryPermission({ mode: 'readwrite' });
+      
+      if (permission !== 'granted') {
+        // Request permission
+        const newPermission = await fileHandle.requestPermission({ mode: 'readwrite' });
+        return newPermission === 'granted';
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('Error checking file permissions:', err);
+      return false;
+    }
+  };
+
+  // Replace the auto-save interval with a cleaner version
+  useEffect(() => {
+    // Only set up the interval if we have a file handle
+    if (!fileHandle) return;
+    
     console.log('Setting up auto-save interval');
     
-    // Force auto-save to run exactly every 1 minute (60000 ms)
-    const intervalId = setInterval(() => {
-      const now = Date.now();
-      
-      console.log('Auto-save check running with conditions:');
-      console.log(`- Has data: ${students.length > 0 || feedbackItems.length > 0}`);
-      console.log(`- Has unsaved changes: ${hasUnsavedChangesRef.current}`);
-      console.log(`- Time since last save: ${(now - lastSaveTimeRef.current) / 1000}s`);
-      
-      // Only run auto-save if we have data
-      if (students.length > 0 || feedbackItems.length > 0) {
-        // Check if it's been at least 1 minute since the last save
-        if (now - lastSaveTimeRef.current >= 60000) {
-          console.log('🔄 Auto-save triggered!');
+    // Check every 60 seconds if there are changes to save
+    const intervalId = setInterval(async () => {
+      // Only auto-save if there are unsaved changes
+      if (hasUnsavedChangesRef.current) {
+        try {
+          // Check if we have permission to write to the file
+          const permission = await fileHandle.queryPermission({ mode: 'readwrite' });
+          
+          if (permission !== 'granted') {
+            // Request permission
+            const newPermission = await fileHandle.requestPermission({ mode: 'readwrite' });
+            
+            if (newPermission !== 'granted') {
+              console.error('Permission denied to write to file');
+              return;
+            }
+          }
           
           // Show saving indicator
           setIsSaving(true);
           
-          // Use the saveData function from App.tsx
-          onSaveData(true, true)
-            .then(success => {
-              if (success) {
-                console.log('✅ Auto-save completed successfully');
-                
-                // Update last save time
-                lastSaveTimeRef.current = Date.now();
-                
-                // Update last saved data
-                lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
-                
-                // Reset unsaved changes flag
-                hasUnsavedChangesRef.current = false;
-                
-                // Format current time for display
-                const timeString = new Date().toLocaleTimeString();
-                onLastAutoSaveTimeUpdate(timeString);
-                
-                // Show auto-save status message
-                setAutoSaveStatus(`Auto-saved at ${timeString}`);
-                setShowAutoSaveStatus(true);
-                
-                // Hide the message after a few seconds
-                setTimeout(() => {
-                  setShowAutoSaveStatus(false);
-                }, 3000);
-              } else {
-                console.error('❌ Auto-save failed');
-              }
-              
-              // Reset saving state
-              setIsSaving(false);
-            })
-            .catch(error => {
-              console.error('❌ Auto-save failed:', error);
-              setIsSaving(false);
-            });
-        } else {
-          console.log(`⏳ Next auto-save in ${((60000 - (now - lastSaveTimeRef.current)) / 1000).toFixed(0)} seconds`);
+          // Create the data to save
+          const data = {
+            students,
+            feedbackItems,
+            assignmentName,
+            timestamp: new Date().toISOString()
+          };
+          
+          // Convert to JSON
+          const jsonData = JSON.stringify(data, null, 2);
+          
+          // Write to the file
+          const writable = await fileHandle.createWritable();
+          await writable.write(jsonData);
+          await writable.close();
+          
+          // Update the last save time
+          lastSaveTimeRef.current = Date.now();
+          
+          // Update the last saved data reference
+          lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
+          
+          // Reset the unsaved changes flag
+          hasUnsavedChangesRef.current = false;
+          
+          // Update the UI
+          const timeString = new Date().toLocaleTimeString();
+          onLastAutoSaveTimeUpdate(timeString);
+          
+          // Show a success message
+          setAutoSaveStatus(`Auto-saved at ${timeString}`);
+          setShowAutoSaveStatus(true);
+          setTimeout(() => setShowAutoSaveStatus(false), 3000);
+        } catch (err) {
+          console.error('Error during auto-save:', err);
+        } finally {
+          // Reset saving state
+          setIsSaving(false);
         }
-      } else {
-        console.log('❌ Auto-save conditions not met (no data)');
       }
-    }, 1000); // Check every second, but only save every minute
+    }, 60000); // Check every 60 seconds
     
-    // Clean up the interval when component unmounts
     return () => clearInterval(intervalId);
-  }, [students, feedbackItems, onSaveData]); // Re-create the interval when these dependencies change
+  }, [fileHandle, students, feedbackItems, assignmentName, onLastAutoSaveTimeUpdate]);
 
   // Check if File System Access API is supported
   useEffect(() => {
@@ -257,6 +317,101 @@ const StudentList: React.FC<{
         setShowAutoSaveStatus(false);
       }, 5000);
     }
+  }, []);
+
+  // Add this useEffect to listen for grading changes
+  useEffect(() => {
+    const handleGradingChange = () => {
+      console.log('Grading change detected via custom event');
+      hasUnsavedChangesRef.current = true;
+    };
+    
+    window.addEventListener('grading-change', handleGradingChange);
+    
+    return () => {
+      window.removeEventListener('grading-change', handleGradingChange);
+    };
+  }, []);
+
+  // Add this useEffect to log the file handle status whenever it changes
+  useEffect(() => {
+    console.log('File handle status changed:', fileHandle ? 'Available' : 'Not available');
+    
+    // If we have a file handle, make sure it's properly set in the parent component
+    if (fileHandle) {
+      console.log('Ensuring file handle is passed to parent');
+      onFileHandleCreated(fileHandle);
+    }
+  }, [fileHandle, onFileHandleCreated]);
+
+  // Add this useEffect to force a re-render when the file handle changes
+  useEffect(() => {
+    if (fileHandle) {
+      console.log('File handle is available:', fileHandle);
+      // Force a re-render by updating a state variable
+      setAutoSaveStatus(prev => {
+        if (prev === 'Auto-save enabled') return prev;
+        return 'Auto-save enabled';
+      });
+    } else {
+      console.log('No file handle available');
+    }
+  }, [fileHandle]);
+
+  // Add this useEffect to retrieve the file handle when the component mounts
+  useEffect(() => {
+    const restoreFileHandle = async () => {
+      try {
+        const handle = await retrieveFileHandle();
+        
+        if (handle) {
+          // Check if we still have permission to access the file
+          const permission = await handle.queryPermission({ mode: 'readwrite' });
+          
+          if (permission === 'granted') {
+            console.log('Restored file handle with permission');
+            setFileHandle(handle);
+            onFileHandleCreated(handle);
+            
+            // Update the auto-save status
+            setAutoSaveStatus('Auto-save enabled');
+            setShowAutoSaveStatus(true);
+            setTimeout(() => {
+              setShowAutoSaveStatus(false);
+            }, 3000);
+          } else {
+            // We need to request permission
+            const newPermission = await handle.requestPermission({ mode: 'readwrite' });
+            
+            if (newPermission === 'granted') {
+              console.log('Restored file handle after requesting permission');
+              setFileHandle(handle);
+              onFileHandleCreated(handle);
+              
+              // Update the auto-save status
+              setAutoSaveStatus('Auto-save enabled');
+              setShowAutoSaveStatus(true);
+              setTimeout(() => {
+                setShowAutoSaveStatus(false);
+              }, 3000);
+            } else {
+              console.log('Permission denied for restored file handle');
+              setAutoSaveStatus('Auto-save permission denied. Please save manually.');
+              setShowAutoSaveStatus(true);
+              setTimeout(() => {
+                setShowAutoSaveStatus(false);
+              }, 5000);
+            }
+          }
+        } else {
+          console.log('No file handle found in storage');
+        }
+      } catch (err) {
+        console.error('Error restoring file handle:', err);
+      }
+    };
+    
+    restoreFileHandle();
   }, []);
 
   // Fix the date comparison
@@ -300,44 +455,122 @@ const StudentList: React.FC<{
     getSortedRowModel: getSortedRowModel(),
   });
 
-  // Modify the handleSaveProgress function to show auto-save enabled indicator
-  const handleSaveProgress = async (autoSave = false): Promise<boolean> => {
-    console.log('handleSaveProgress called with autoSave =', autoSave);
-    setIsSaving(true);
-    
+  // Update the handleSaveProgress function to enable auto-save
+  const handleSaveProgress = async () => {
     try {
-      const result = await onSaveData(true, autoSave);
+      setIsSaving(true);
       
-      if (result) {
-        // Update last save time
+      // If we already have a file handle, use it
+      if (fileHandle) {
+        // Check if we have permission to write to the file
+        const permission = await fileHandle.queryPermission({ mode: 'readwrite' });
+        
+        if (permission !== 'granted') {
+          // Request permission
+          const newPermission = await fileHandle.requestPermission({ mode: 'readwrite' });
+          
+          if (newPermission !== 'granted') {
+            console.error('Permission denied to write to file');
+            setError('Permission denied to write to file');
+            setIsSaving(false);
+            return false;
+          }
+        }
+        
+        // Create the data to save
+        const data = {
+          students,
+          feedbackItems,
+          assignmentName,
+          timestamp: new Date().toISOString()
+        };
+        
+        // Convert to JSON
+        const jsonData = JSON.stringify(data, null, 2);
+        
+        // Write to the file
+        const writable = await fileHandle.createWritable();
+        await writable.write(jsonData);
+        await writable.close();
+        
+        // Update the last save time
         lastSaveTimeRef.current = Date.now();
         
-        // Update last saved data
+        // Update the last saved data reference
         lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
         
-        // Reset unsaved changes flag
+        // Reset the unsaved changes flag
         hasUnsavedChangesRef.current = false;
         
-        // Format current time for display
+        // Update the UI
         const timeString = new Date().toLocaleTimeString();
         onLastAutoSaveTimeUpdate(timeString);
         
-        // Reset isNewImport after successful save
-        setIsNewImport(false);
+        // Show a success message
+        setAutoSaveStatus(`Saved at ${timeString}`);
+        setShowAutoSaveStatus(true);
+        setTimeout(() => setShowAutoSaveStatus(false), 3000);
         
-        // Set file handle if it's not already set (first save)
-        if (!fileHandle) {
-          // Show auto-save enabled message
-          setAutoSaveStatus('Auto-save enabled');
-          setShowAutoSaveStatus(true);
-          setTimeout(() => {
-            setShowAutoSaveStatus(false);
-          }, 3000);
-        }
+        setIsSaving(false);
+        return true;
+      } else {
+        // We don't have a file handle yet, so create one (enable auto-save)
+        console.log('No file handle yet, creating one...');
+        
+        // Show the file picker to get a new file handle
+        const handle = await window.showSaveFilePicker({
+          suggestedName: "grading_progress.json",
+          types: [{
+            description: 'JSON Files',
+            accept: { 'application/json': ['.json'] },
+          }],
+        });
+        
+        console.log('New file handle created:', handle);
+        
+        // Set the file handle in the component state
+        setFileHandle(handle);
+        
+        // Pass the file handle to the parent component
+        onFileHandleCreated(handle);
+        
+        // Save the current data to the file
+        const data = {
+          students,
+          feedbackItems,
+          assignmentName,
+          timestamp: new Date().toISOString()
+        };
+        
+        const jsonData = JSON.stringify(data, null, 2);
+        
+        const writable = await handle.createWritable();
+        await writable.write(jsonData);
+        await writable.close();
+        
+        console.log('Initial data saved to new file');
+        
+        // Update the last save time
+        lastSaveTimeRef.current = Date.now();
+        
+        // Update the last saved data reference
+        lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
+        
+        // Reset the unsaved changes flag
+        hasUnsavedChangesRef.current = false;
+        
+        // Update the UI
+        const timeString = new Date().toLocaleTimeString();
+        onLastAutoSaveTimeUpdate(timeString);
+        
+        // Show a success message
+        setAutoSaveStatus('Saved and auto-save enabled');
+        setShowAutoSaveStatus(true);
+        setTimeout(() => setShowAutoSaveStatus(false), 3000);
+        
+        setIsSaving(false);
+        return true;
       }
-      
-      setIsSaving(false);
-      return result;
     } catch (error) {
       console.error('Error in handleSaveProgress:', error);
       setIsSaving(false);
@@ -364,6 +597,7 @@ const StudentList: React.FC<{
     const isProgressFile = file.name.endsWith('.json');
     
     const reader = new FileReader();
+    
     reader.onload = async (event) => {
       try {
         const content = event.target?.result as string;
@@ -387,6 +621,7 @@ const StudentList: React.FC<{
             students: loadOptions.loadStudents ? data.students : students,
             feedbackItems: loadOptions.loadFeedback ? data.feedbackItems : feedbackItems
           });
+          console.log('Setting lastSavedDataRef from loaded file');
           
           // Reset unsaved changes flag
           hasUnsavedChangesRef.current = false;
@@ -405,17 +640,22 @@ const StudentList: React.FC<{
           sessionStorage.setItem('loadedFileContent', content);
           sessionStorage.setItem('loadedFileName', file.name);
           
-          // Set a flag to show the enable auto-save button
-          setFileLoadedNoAutoSave(true);
-          
-          // Show a message about enabling auto-save
-          setAutoSaveStatus('File loaded. Click "Enable Auto-Save" to continue.');
-          setShowAutoSaveStatus(true);
-          
+          // Automatically try to enable auto-save
+          try {
+            await createNewFileHandle();
+          } catch (err) {
+            console.error('Failed to automatically enable auto-save:', err);
+            // Show a message that auto-save couldn't be enabled
+            setAutoSaveStatus('Auto-save could not be enabled automatically. Use "Save Progress" to save your work.');
+            setShowAutoSaveStatus(true);
+            setTimeout(() => {
+              setShowAutoSaveStatus(false);
+            }, 5000);
+          }
         } else {
           // This is a CSV import from Moodle, not a progress file
           // Don't prompt for auto-save yet - wait for the user to manually save first
-          setAutoSaveStatus('New data imported. Save progress to enable auto-save.');
+          setAutoSaveStatus('New data imported. Use "Save Progress" to save your work.');
           setShowAutoSaveStatus(true);
           setTimeout(() => {
             setShowAutoSaveStatus(false);
@@ -450,8 +690,17 @@ const StudentList: React.FC<{
       
       // Show the save picker to get a file handle
       const handle = await window.showSaveFilePicker(options);
+      
+      // Set the file handle in the component state
       setFileHandle(handle);
+      
+      // Store the file handle for future sessions
+      await storeFileHandle(handle);
+      
+      // IMPORTANT: Pass the file handle back to the parent component
       onFileHandleCreated(handle);
+      
+      console.log('File handle created and passed to parent:', handle);
       
       // Save the file immediately to the selected location
       const writable = await handle.createWritable();
@@ -460,6 +709,14 @@ const StudentList: React.FC<{
       
       // Update the last save time
       lastSaveTimeRef.current = Date.now();
+      
+      // Update the last saved data reference with the current data
+      lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
+      
+      // Reset the unsaved changes flag
+      hasUnsavedChangesRef.current = false;
+      
+      // Format current time for display
       const timeString = new Date().toLocaleTimeString();
       onLastAutoSaveTimeUpdate(timeString);
       
@@ -490,6 +747,69 @@ const StudentList: React.FC<{
     }
   };
 
+  // Add this function to create a new file handle
+  const createNewFileHandle = async () => {
+    try {
+      console.log('Creating new file handle...');
+      
+      // Show the file picker to get a new file handle
+      const handle = await window.showSaveFilePicker({
+        suggestedName: "grading_progress.json",
+        types: [{
+          description: 'JSON Files',
+          accept: { 'application/json': ['.json'] },
+        }],
+      });
+      
+      console.log('New file handle created:', handle);
+      
+      // Set the file handle in the component state
+      setFileHandle(handle);
+      
+      // Pass the file handle to the parent component
+      onFileHandleCreated(handle);
+      
+      // Save the current data to the file
+      const data = {
+        students,
+        feedbackItems,
+        assignmentName,
+        timestamp: new Date().toISOString()
+      };
+      
+      const jsonData = JSON.stringify(data, null, 2);
+      
+      const writable = await handle.createWritable();
+      await writable.write(jsonData);
+      await writable.close();
+      
+      console.log('Initial data saved to new file');
+      
+      // Update the last save time
+      lastSaveTimeRef.current = Date.now();
+      
+      // Update the last saved data reference
+      lastSavedDataRef.current = JSON.stringify({ students, feedbackItems });
+      
+      // Reset the unsaved changes flag
+      hasUnsavedChangesRef.current = false;
+      
+      // Update the UI
+      const timeString = new Date().toLocaleTimeString();
+      onLastAutoSaveTimeUpdate(timeString);
+      
+      // Show a success message
+      setAutoSaveStatus('Auto-save enabled');
+      setShowAutoSaveStatus(true);
+      setTimeout(() => setShowAutoSaveStatus(false), 3000);
+      
+      return true;
+    } catch (err) {
+      console.error('Error creating new file handle:', err);
+      return false;
+    }
+  };
+
   // Add this function to check if all students have grades and feedback
   const isGradingComplete = () => {
     return students.every(student => {
@@ -506,7 +826,7 @@ const StudentList: React.FC<{
     }
     
     // Save progress first
-    handleSaveProgress(false).then((success) => {
+    handleSaveProgress().then((success) => {
       if (success) {
         // Close the current window/tab
         window.close();
@@ -545,12 +865,14 @@ const StudentList: React.FC<{
                 selectedStudent={selectedStudent}
                 onStudentSelect={onStudentSelect}
                 selectedFeedbackId={selectedFeedbackId}
+                onStudentModified={markChanges}
               />
             </Table>
           </div>
         </div>
       </div>
 
+      {/* Only show debug panel when explicitly enabled with keyboard shortcut */}
       <AutoSaveDebugPanel
         isVisible={showDebugPanel}
         lastSaveTime={lastSaveTimeRef.current}
