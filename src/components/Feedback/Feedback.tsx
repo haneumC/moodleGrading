@@ -398,6 +398,56 @@ const Feedback: React.FC<FeedbackProps> = ({
   };
 
   const handleDeleteFeedback = (id: number) => {
+    // Get the feedback item before deleting it
+    const feedbackToDelete = feedbackItems.find(item => item.id === id);
+    
+    if (feedbackToDelete) {
+      // Update students who have this feedback applied
+      onStudentsUpdate(prevStudents =>
+        prevStudents.map(student => {
+          if (student.appliedIds?.includes(id)) {
+            const oldState = { ...student };
+            
+            // Remove the feedback text
+            const feedbackLines = student.feedback
+              .split('\n\n')
+              .filter(line => line.trim() !== feedbackToDelete.comment.trim())
+              .filter(line => line.trim() !== '')
+              .join('\n\n');
+
+            // Remove the id from appliedIds
+            const newAppliedIds = student.appliedIds.filter(appliedId => appliedId !== id);
+            
+            // Recalculate grade based on remaining feedback
+            const remainingDeduction = newAppliedIds.reduce((sum, appliedId) => {
+              const feedback = feedbackItems.find(f => f.id === appliedId);
+              return sum + (feedback?.grade || 0);
+            }, 0);
+            
+            const newState = {
+              ...student,
+              grade: newAppliedIds.length === 0 ? "" : (20 - remainingDeduction).toString(),
+              feedback: feedbackLines || "",
+              appliedIds: newAppliedIds,
+            };
+
+            // Track the change
+            onChangeTracked({
+              type: 'feedback',
+              studentName: student.name,
+              oldValue: oldState,
+              newValue: newState,
+              timestamp: new Date().toISOString()
+            });
+
+            return newState;
+          }
+          return student;
+        })
+      );
+    }
+
+    // Now remove the feedback item itself
     setReusableIds(prev => [...prev, id]);
     setFeedbackItems(feedbackItems.filter(item => item.id !== id));
   };

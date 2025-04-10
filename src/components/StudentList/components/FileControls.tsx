@@ -148,7 +148,7 @@ const FileControls: React.FC<FileControlsProps> = ({
       {autoSaveStatus === 'Please select a location to enable auto-save...' && (
         <StatusMessage 
           message="Please select where to save this file to enable auto-save" 
-          type="info" 
+          type="success" 
           icon="💾"
         />
       )}

@@ -7,7 +7,7 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { Table } from "@/components/ui/table";
-import { Student, SaveData, ChangeRecord } from './types';
+import { Student, SaveData, ChangeRecord, FeedbackItem } from './types';
 import TableHeaderComponent from './components/TableHeader';
 import TableBodyComponent from './components/TableBody';
 import FileControls from './components/FileControls';
@@ -51,8 +51,8 @@ const StudentList: React.FC<{
   assignmentName: string;
   setAssignmentName: React.Dispatch<React.SetStateAction<string>>;
   onChangeTracked: (change: ChangeRecord) => void;
-  feedbackItems: any[];
-  setFeedbackItems: React.Dispatch<React.SetStateAction<any[]>>;
+  feedbackItems: FeedbackItem[];
+  setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
   onLastAutoSaveTimeUpdate: (time: string) => void;
   selectedFeedbackId: number | null;
   onSaveData: (showStatus: boolean, isAuto: boolean) => Promise<boolean>;
@@ -110,9 +110,6 @@ const StudentList: React.FC<{
 
   // Add this state
   const [isSaving, setIsSaving] = useState<boolean>(false);
-
-  // Add this state variable to track the last auto-save time
-  const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
 
   // Add a state to track if a file is loaded but auto-save isn't enabled yet
   const [fileLoadedNoAutoSave, setFileLoadedNoAutoSave] = useState(false);
@@ -214,7 +211,7 @@ const StudentList: React.FC<{
                 
                 // Format current time for display
                 const timeString = new Date().toLocaleTimeString();
-                setLastAutoSaveTime(timeString);
+                onLastAutoSaveTimeUpdate(timeString);
                 
                 // Show auto-save status message
                 setAutoSaveStatus(`Auto-saved at ${timeString}`);
@@ -323,7 +320,7 @@ const StudentList: React.FC<{
         
         // Format current time for display
         const timeString = new Date().toLocaleTimeString();
-        setLastAutoSaveTime(timeString);
+        onLastAutoSaveTimeUpdate(timeString);
         
         // Reset isNewImport after successful save
         setIsNewImport(false);
@@ -450,7 +447,6 @@ const StudentList: React.FC<{
       // Update the last save time
       lastSaveTimeRef.current = Date.now();
       const timeString = new Date().toLocaleTimeString();
-      setLastAutoSaveTime(timeString);
       onLastAutoSaveTimeUpdate(timeString);
       
       setAutoSaveStatus('Auto-save enabled');
@@ -493,7 +489,7 @@ const StudentList: React.FC<{
           showAutoSaveStatus={showAutoSaveStatus}
           hasData={students.length > 0}
           isSaving={isSaving}
-          fileHandle={fileHandle}
+          fileHandle={fileHandle || undefined}
           isNewImport={isNewImport}
           fileLoadedNoAutoSave={fileLoadedNoAutoSave}
           onEnableAutoSave={handleEnableAutoSave}
