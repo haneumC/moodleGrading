@@ -769,8 +769,17 @@ const StudentList: React.FC<{
     // Save progress first
     handleSaveProgress().then((success) => {
       if (success) {
-        // Close the current window/tab
-        window.close();
+        // Write grades and feedback to Moodle's interface
+        const event = new CustomEvent('write-to-moodle', {
+          detail: {
+            students: students.map(student => ({
+              email: student.email,
+              grade: student.grade,
+              feedback: student.feedback
+            }))
+          }
+        });
+        window.dispatchEvent(event);
       } else {
         alert('Please save your changes before submitting.');
       }

@@ -313,4 +313,41 @@ window.addEventListener('message', function(event) {
       }, event.origin);
     }
   }
+});
+
+function writeGradesToMoodle(students) {
+  const rows = document.querySelectorAll('table.generaltable tbody tr');
+  
+  rows.forEach(row => {
+    // Get the email cell from the row
+    const emailCell = row.querySelector('td:nth-child(4)');
+    if (!emailCell) return;
+    
+    const email = emailCell.textContent.trim();
+    const student = students.find(s => s.email === email);
+    
+    if (student) {
+      // Find the grade input
+      const gradeInput = row.querySelector('input[name^="grade"]');
+      if (gradeInput) {
+        gradeInput.value = student.grade;
+        // Trigger change event
+        gradeInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      
+      // Find the feedback textarea
+      const feedbackTextarea = row.querySelector('textarea[name^="feedback"]');
+      if (feedbackTextarea) {
+        feedbackTextarea.value = student.feedback;
+        // Trigger change event
+        feedbackTextarea.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+  });
+}
+
+// Add event listener for the custom event
+window.addEventListener('write-to-moodle', (event) => {
+  const { students } = event.detail;
+  writeGradesToMoodle(students);
 }); 
