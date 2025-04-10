@@ -536,8 +536,8 @@ const StudentList: React.FC<{
           fileLoadedNoAutoSave={fileLoadedNoAutoSave}
           onEnableAutoSave={handleEnableAutoSave}
         />
-        <div className="rounded-md border">
-          <div className="table-container">
+        <div className="table-container bg-[#2d2d2d] rounded-lg p-4 shadow-lg">
+          <div className="overflow-hidden">
             <Table>
               <TableHeaderComponent headerGroups={table.getHeaderGroups()} />
               <TableBodyComponent
