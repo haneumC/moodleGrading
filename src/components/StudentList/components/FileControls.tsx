@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import StatusMessage from '@/components/StatusMessage/StatusMessage';
 import './FileControls.css';
 
@@ -42,6 +42,12 @@ const FileControls: React.FC<FileControlsProps> = ({
   const [loadStudents, setLoadStudents] = useState(true);
   const [loadFeedback, setLoadFeedback] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isExtension, setIsExtension] = useState(false);
+
+  useEffect(() => {
+    // Check if we're running as an extension by looking for chrome-extension:// in the URL
+    setIsExtension(window.location.href.startsWith('chrome-extension://'));
+  }, []);
 
   const handleSaveProgress = async () => {
     console.log('Manual save triggered');
@@ -122,19 +128,21 @@ const FileControls: React.FC<FileControlsProps> = ({
             >
               Load Progress
             </button>
-            <button
-              className="studentBtn"
-              onClick={onSubmit}
-              disabled={!hasData || !isGradingComplete}
-              style={{ 
-                cursor: (hasData && isGradingComplete) ? 'pointer' : 'not-allowed',
-                opacity: (hasData && isGradingComplete) ? 1 : 0.5,
-                marginLeft: '10px'
-              }}
-              title={!isGradingComplete ? 'Please complete all grades and feedback before submitting' : ''}
-            >
-              Submit
-            </button>
+            {isExtension && (
+              <button
+                className="studentBtn"
+                onClick={onSubmit}
+                disabled={!hasData || !isGradingComplete}
+                style={{ 
+                  cursor: (hasData && isGradingComplete) ? 'pointer' : 'not-allowed',
+                  opacity: (hasData && isGradingComplete) ? 1 : 0.5,
+                  marginLeft: '10px'
+                }}
+                title={!isGradingComplete ? 'Please complete all grades and feedback before submitting' : ''}
+              >
+                Submit
+              </button>
+            )}
             {showLoadOptions && (
               <div className="load-options">
                 <div className="checkbox-container">

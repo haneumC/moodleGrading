@@ -74,6 +74,45 @@ function collectGradingData() {
   return data;
 }
 
+// Function to create Submit button
+function createSubmitButton() {
+  const button = document.createElement('button');
+  button.className = 'btn btn-primary submit-grades-btn';
+  button.style.cssText = `
+    background-color: #4CAF50;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    font-size: 14px;
+    margin: 10px 0;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  `;
+  
+  button.textContent = 'Submit';
+  
+  button.addEventListener('mouseenter', () => {
+    button.style.backgroundColor = '#45a049';
+  });
+  
+  button.addEventListener('mouseleave', () => {
+    button.style.backgroundColor = '#4CAF50';
+  });
+
+  button.addEventListener('click', () => {
+    // Find and click the original Moodle submit button
+    const moodleSubmitBtn = document.querySelector('input[name="savechanges"]');
+    if (moodleSubmitBtn) {
+      moodleSubmitBtn.click();
+    } else {
+      alert('Submit button not found on the page');
+    }
+  });
+
+  return button;
+}
+
 // Function to add the button to the page
 function addGradingButton() {
   // Check if button already exists
@@ -81,23 +120,29 @@ function addGradingButton() {
     return;
   }
 
-  // Create the button
-  const btn = document.createElement('button');
-  btn.textContent = 'Open Moodle Grading';
-  btn.className = 'btn btn-primary moodle-grading-btn';
-  btn.style.cssText = `
-    margin-left: 10px;
+  // Create container for buttons
+  const buttonContainer = document.createElement('div');
+  buttonContainer.style.cssText = `
+    display: flex;
+    gap: 10px;
+    margin: 10px 0;
+  `;
+
+  // Create the grading button
+  const gradingBtn = document.createElement('button');
+  gradingBtn.textContent = 'Open Moodle Grading';
+  gradingBtn.className = 'btn btn-primary moodle-grading-btn';
+  gradingBtn.style.cssText = `
     background-color: #0f6cbf;
     border: none;
     padding: 7px 12px;
     border-radius: 4px;
     color: white;
     cursor: pointer;
-    display: inline-block;
   `;
 
-  // Add click handler
-  btn.addEventListener('click', function(e) {
+  // Add click handler for grading button
+  gradingBtn.addEventListener('click', function(e) {
     e.preventDefault();
     e.stopPropagation();
     
@@ -107,7 +152,6 @@ function addGradingButton() {
         alert('No student data found.');
         return;
       }
-      // Only encode the data when creating the URL
       const encodedData = encodeURIComponent(JSON.stringify(data));
       window.open(`https://haneumc.github.io/moodleGrading/?data=${encodedData}`, '_blank');
     } catch (error) {
@@ -116,18 +160,25 @@ function addGradingButton() {
     }
   });
 
+  // Create submit button
+  const submitBtn = createSubmitButton();
+
+  // Add buttons to container
+  buttonContainer.appendChild(gradingBtn);
+  buttonContainer.appendChild(submitBtn);
+
   // Find the grading action dropdown
   const gradingDropdown = document.querySelector('select[name="jump"]');
   if (gradingDropdown) {
-    // Insert the button right after the dropdown
-    gradingDropdown.insertAdjacentElement('afterend', btn);
+    // Insert the button container right after the dropdown
+    gradingDropdown.insertAdjacentElement('afterend', buttonContainer);
     return;
   }
 
   // Fallback - add to the top of the grading table
   const gradingTable = document.querySelector('.generaltable');
   if (gradingTable) {
-    gradingTable.parentElement.insertBefore(btn, gradingTable);
+    gradingTable.parentElement.insertBefore(buttonContainer, gradingTable);
   }
 }
 
