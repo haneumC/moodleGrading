@@ -12,6 +12,7 @@ interface FileControlsProps {
   autoSaveStatus: string;
   showAutoSaveStatus: boolean;
   hasData: boolean;
+  isGradingComplete: boolean;
   isSaving: boolean;
   lastAutoSaveTime?: string;
   fileHandle?: FileSystemFileHandle;
@@ -30,6 +31,7 @@ const FileControls: React.FC<FileControlsProps> = ({
   autoSaveStatus,
   showAutoSaveStatus,
   hasData,
+  isGradingComplete,
   isSaving,
   fileHandle,
   isNewImport,
@@ -122,12 +124,13 @@ const FileControls: React.FC<FileControlsProps> = ({
             <button
               className="studentBtn"
               onClick={onSubmit}
-              disabled={!hasData}
+              disabled={!hasData || !isGradingComplete}
               style={{ 
-                cursor: hasData ? 'pointer' : 'not-allowed',
-                opacity: hasData ? 1 : 0.5,
+                cursor: (hasData && isGradingComplete) ? 'pointer' : 'not-allowed',
+                opacity: (hasData && isGradingComplete) ? 1 : 0.5,
                 marginLeft: '10px'
               }}
+              title={!isGradingComplete ? 'Please complete all grades and feedback before submitting' : ''}
             >
               Submit
             </button>

@@ -490,7 +490,21 @@ const StudentList: React.FC<{
     }
   };
 
+  // Add this function to check if all students have grades and feedback
+  const isGradingComplete = () => {
+    return students.every(student => {
+      const hasGrade = student.grade && student.grade.trim() !== '';
+      const hasFeedback = student.feedback && student.feedback.trim() !== '';
+      return hasGrade && hasFeedback;
+    });
+  };
+
   const handleSubmit = () => {
+    if (!isGradingComplete()) {
+      alert('Please complete all grades and feedback before submitting.');
+      return;
+    }
+    
     // Save progress first
     handleSaveProgress(false).then((success) => {
       if (success) {
@@ -515,6 +529,7 @@ const StudentList: React.FC<{
           autoSaveStatus={autoSaveStatus}
           showAutoSaveStatus={showAutoSaveStatus}
           hasData={students.length > 0}
+          isGradingComplete={isGradingComplete()}
           isSaving={isSaving}
           fileHandle={fileHandle || undefined}
           isNewImport={isNewImport}
