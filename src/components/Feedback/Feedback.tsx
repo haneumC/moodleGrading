@@ -275,7 +275,7 @@ const Feedback: React.FC<FeedbackProps> = ({
             // Remove the feedback
             const feedbackLines = student.feedback
               .split('\n\n')
-              .filter(line => line.trim() !== feedbackItem.comment.trim())
+              .filter(line => !line.trim().startsWith(`${feedbackItem.grade}: ${feedbackItem.comment.trim()}`))
               .filter(line => line.trim() !== '')
               .join('\n\n');
 
@@ -302,9 +302,10 @@ const Feedback: React.FC<FeedbackProps> = ({
             // Apply the feedback
             const newAppliedIds = [...currentAppliedIds, feedbackItem.id];
             const newGrade = (20 - feedbackItem.grade).toString();
+            const formattedFeedback = `${feedbackItem.grade}: ${feedbackItem.comment.trim()}`;
             const newFeedback = student.feedback
-              ? `${student.feedback.trim()}\n\n${feedbackItem.comment.trim()}`
-              : feedbackItem.comment.trim();
+              ? `${student.feedback.trim()}\n\n${formattedFeedback}`
+              : formattedFeedback;
 
             const newState = {
               ...student,
@@ -408,10 +409,10 @@ const Feedback: React.FC<FeedbackProps> = ({
           if (student.appliedIds?.includes(id)) {
             const oldState = { ...student };
             
-            // Remove the feedback text
+            // Remove the feedback text with the correct format
             const feedbackLines = student.feedback
               .split('\n\n')
-              .filter(line => line.trim() !== feedbackToDelete.comment.trim())
+              .filter(line => !line.trim().startsWith(`${feedbackToDelete.grade}: ${feedbackToDelete.comment.trim()}`))
               .filter(line => line.trim() !== '')
               .join('\n\n');
 
