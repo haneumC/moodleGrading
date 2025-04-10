@@ -44,8 +44,9 @@ const FileControls: React.FC<FileControlsProps> = ({
   const [isExtension, setIsExtension] = useState(false);
 
   useEffect(() => {
-    // Check if we're running as an extension by looking for chrome-extension:// in the URL
-    setIsExtension(window.location.href.startsWith('chrome-extension://'));
+    // Check if we're running from the extension by looking for the data parameter in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    setIsExtension(urlParams.has('data'));
   }, []);
 
   const handleSaveProgress = async () => {
