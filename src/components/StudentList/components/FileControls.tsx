@@ -73,6 +73,7 @@ const FileControls: React.FC<FileControlsProps> = ({
             onClick={onExport}
             disabled={!hasData}
             style={{ opacity: hasData ? 1 : 0.5, cursor: hasData ? 'pointer' : 'not-allowed' }}
+            aria-label="Export for Moodle"
           >
             Export for Moodle
           </button>
@@ -104,21 +105,13 @@ const FileControls: React.FC<FileControlsProps> = ({
               style={{ display: 'none' }}
             />
           </label>
-          {fileLoadedNoAutoSave && (
-            <button 
-              className="studentBtn highlight-btn" 
-              onClick={onEnableAutoSave}
-            >
-              Enable Auto-Save
-            </button>
-          )}
         </div>
         
         {/* Show different messages based on whether this is a new import or loaded file */}
-        {isNewImport && !fileHandle && (
+        {!fileHandle && (
           <div className="import-status">
             <span className="import-dot"></span>
-            New data imported. Click "Save Progress" to enable auto-save.
+            Click "Save Progress" to enable auto-save.
           </div>
         )}
         
