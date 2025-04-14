@@ -268,18 +268,15 @@ const Feedback: React.FC<FeedbackProps> = ({
         if (student.name === selectedStudent) {
           const oldState = { ...student };
           
-          // Ensure appliedIds is an array
           const currentAppliedIds = Array.isArray(student.appliedIds) ? student.appliedIds : [];
           
           if (currentAppliedIds.includes(feedbackItem.id)) {
-            // Remove the feedback
             const feedbackLines = student.feedback
               .split('\n\n')
-              .filter(line => !line.trim().startsWith(`${feedbackItem.grade}: ${feedbackItem.comment.trim()}`))
+              .filter(line => !line.trim().startsWith(`${feedbackItem.comment.trim()}`))
               .filter(line => line.trim() !== '')
               .join('\n\n');
 
-            // Calculate new grade
             const remainingIds = currentAppliedIds.filter(id => id !== feedbackItem.id);
             const newState = {
               ...student,
@@ -288,7 +285,6 @@ const Feedback: React.FC<FeedbackProps> = ({
               appliedIds: remainingIds,
             };
 
-            // Track the change
             onChangeTracked({
               type: 'feedback',
               studentName: student.name,
@@ -299,10 +295,9 @@ const Feedback: React.FC<FeedbackProps> = ({
 
             return newState;
           } else {
-            // Apply the feedback
             const newAppliedIds = [...currentAppliedIds, feedbackItem.id];
             const newGrade = (20 - feedbackItem.grade).toString();
-            const formattedFeedback = `${feedbackItem.grade}: ${feedbackItem.comment.trim()}`;
+            const formattedFeedback = `${feedbackItem.comment.trim()}`;
             const newFeedback = student.feedback
               ? `${student.feedback.trim()}\n\n${formattedFeedback}`
               : formattedFeedback;
@@ -314,10 +309,8 @@ const Feedback: React.FC<FeedbackProps> = ({
               appliedIds: newAppliedIds,
             };
 
-            // Debug: Log the new state
             console.log(`Applied feedback ${feedbackItem.id} to student ${student.name}`, newState);
 
-            // Track the change
             onChangeTracked({
               type: 'feedback',
               studentName: student.name,
@@ -333,7 +326,6 @@ const Feedback: React.FC<FeedbackProps> = ({
       })
     );
     
-    // Mark that changes have been made
     if (window.markGradingChanges) {
       window.markGradingChanges();
     }

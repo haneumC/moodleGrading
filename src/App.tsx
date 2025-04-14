@@ -220,18 +220,16 @@ const MainApp = () => {
     setStudents(prevStudents => 
       prevStudents.map(student => {
         if (Array.isArray(student.appliedIds) && student.appliedIds.includes(oldFeedback.id)) {
-          // Replace old feedback text with new one
           const updatedFeedback = student.feedback
             .split('\n\n')
             .map(line => {
-              if (line.trim().startsWith(`${oldFeedback.grade}: ${oldFeedback.comment.trim()}`)) {
-                return `${newFeedback.grade}: ${newFeedback.comment.trim()}`;
+              if (line.trim().startsWith(`${oldFeedback.comment.trim()}`)) {
+                return `${newFeedback.comment.trim()}`;
               }
               return line;
             })
             .join('\n\n');
 
-          // Recalculate grade
           const totalDeduction = student.appliedIds.reduce((sum, id) => {
             if (id === oldFeedback.id) {
               return sum + newFeedback.grade;
@@ -242,7 +240,6 @@ const MainApp = () => {
 
           const newGrade = Math.max(0, 20 - totalDeduction);
 
-          // Dispatch a custom event to mark unsaved changes
           window.dispatchEvent(new CustomEvent('grading-change'));
           
           return {
