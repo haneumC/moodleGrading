@@ -671,10 +671,6 @@ const Feedback: React.FC<FeedbackProps> = ({
           </Button>
         )}
       </div>
-      <div className="file-info">
-        <span>File: {fileName || 'No file selected'}</span>
-        <span>Max Points: {maxPoints}</span>
-      </div>
     </div>
   );
 };
