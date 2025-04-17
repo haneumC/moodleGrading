@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -101,31 +101,33 @@ const SortableItem = ({
             <Textarea
               value={editingText}
               onChange={(e) => setEditingText(e.target.value)}
-              className="bg-[#2d2d2d] border-[#444] text-white min-h-[60px] resize-y"
+              className="bg-[#2d2d2d] border-[#444] text-white min-h-[40px] resize-y p-1"
             />
           </TableCell>
           <TableCell>
-            <Input
-              type="number"
-              value={editingDeduction}
-              onChange={(e) => setEditingDeduction(Number(e.target.value))}
-              className="w-[80px] bg-[#2d2d2d] border-[#444] text-white"
-              min={0}
-              max={20}
-            />
+            <div className="flex justify-center">
+              <Input
+                type="number"
+                value={editingDeduction}
+                onChange={(e) => setEditingDeduction(Number(e.target.value))}
+                className="w-[60px] bg-[#2d2d2d] border-[#444] text-white p-1 text-center"
+                min={0}
+                max={20}
+              />
+            </div>
           </TableCell>
           <TableCell>
-            <div className="flex space-x-2">
+            <div className="flex space-x-1">
               <Button 
                 onClick={() => onAcceptEdit(item.id)}
-                className="bg-[#4CAF50] hover:bg-[#45a049] text-white"
+                className="bg-[#4CAF50] hover:bg-[#45a049] text-white p-1"
                 size="sm"
               >
                 ✓
               </Button>
               <Button 
                 onClick={onRejectEdit}
-                className="bg-[#f44336] hover:bg-[#d32f2f] text-white"
+                className="bg-[#f44336] hover:bg-[#d32f2f] text-white p-1"
                 size="sm"
               >
                 ✕
@@ -137,7 +139,7 @@ const SortableItem = ({
         <>
           <TableCell>
             <div 
-              className={`p-2 rounded border-l-4 transition-colors whitespace-pre-wrap break-words ${
+              className={`p-1 rounded border-l-4 transition-colors whitespace-pre-wrap break-words text-sm ${
                 isSelected 
                   ? 'bg-[#3a5a3e] border-[#6CAF70] text-[#ffffff] selected-feedback'
                   : appliedIds.includes(item.id)
@@ -153,17 +155,15 @@ const SortableItem = ({
               }}
             >
               <div {...attributes} {...listeners} className="cursor-move inline-block">
-                <i className="bi bi-grip-vertical mr-2 text-gray-500"></i>
+                <i className="bi bi-grip-vertical mr-1 text-gray-500"></i>
               </div>
               <span 
-                className="cursor-pointer hover:bg-[#454b5a] p-1 rounded transition-colors inline-block"
+                className="cursor-pointer hover:bg-[#454b5a] p-0.5 rounded transition-colors inline-block"
                 onClick={(e) => {
                   e.stopPropagation();
                   if (e.ctrlKey || e.metaKey) {
-                    // If Ctrl/Cmd key is pressed, start editing
                     onStartEdit(item);
                   } else {
-                    // Otherwise, select the feedback
                     console.log('Clicking on feedback text:', item.id);
                     onFeedbackSelect && onFeedbackSelect(item.id);
                   }
@@ -174,7 +174,7 @@ const SortableItem = ({
             </div>
           </TableCell>
           <TableCell 
-            className="text-right pr-5 text-white cursor-pointer"
+            className="text-center text-white cursor-pointer w-16"
             onClick={() => onStartEdit(item)}
           >
             {item.grade}
@@ -185,7 +185,7 @@ const SortableItem = ({
               size="icon"
               disabled={!selectedStudent}
               onClick={() => onApplyFeedback(item)}
-              className={`w-6 h-6 rounded-full ${
+              className={`w-5 h-5 rounded-full ${
                 selectedStudent && appliedIds.includes(item.id)
                   ? 'bg-white' 
                   : 'border border-gray-400 hover:border-gray-300'
@@ -199,12 +199,12 @@ const SortableItem = ({
             </Button>
           </TableCell>
           <TableCell>
-            <div className="flex space-x-2">
+            <div className="flex space-x-0.5">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => onStartEdit(item)}
-                className="text-blue-400 hover:text-blue-300 hover:bg-transparent"
+                className="text-blue-400 hover:text-blue-300 hover:bg-transparent px-1.5"
               >
                 <i className="bi bi-pencil"></i>
               </Button>
@@ -212,7 +212,7 @@ const SortableItem = ({
                 variant="ghost"
                 size="sm"
                 onClick={() => onDeleteFeedback(item.id)}
-                className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent"
+                className="text-[#f44336] hover:text-[#d32f2f] hover:bg-transparent px-1.5"
               >
                 <i className="bi bi-trash"></i>
               </Button>
@@ -248,6 +248,8 @@ const Feedback: React.FC<FeedbackProps> = ({
   const [reusableIds, setReusableIds] = useState<number[]>([]);
   const [nextId, setNextId] = useState<number>(5);
   const [useManualOrder, setUseManualOrder] = useState(false);
+  const [fileName, setFileName] = useState<string>('');
+  const [maxPoints, setMaxPoints] = useState<number>(20);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -513,6 +515,42 @@ const Feedback: React.FC<FeedbackProps> = ({
 
   const sortedItems = getSortedFeedbackItems();
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFileName(file.name);
+      // existing file handling logic...
+    }
+  };
+
+  const handleLoadProgress = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    options?: { loadStudents: boolean; loadFeedback: boolean }
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setFileName(file.name); // Set the file name
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const content = event.target?.result as string;
+        const data = JSON.parse(content) as SaveData;
+
+        if (data.maxPoints) {
+          setMaxPoints(data.maxPoints); // Update max points
+        }
+
+        // existing logic to load students and feedback...
+      } catch (error) {
+        console.error('Error parsing file:', error);
+        setError("Invalid file format");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-280px)] flex flex-col mt-5">
       <div className="overflow-y-auto flex-1 mb-4">
@@ -537,7 +575,7 @@ const Feedback: React.FC<FeedbackProps> = ({
                   )}
                 </TableHead>
                 <TableHead 
-                  className="w-[100px] text-[#e1e1e1] cursor-pointer"
+                  className="w-[80px] text-[#e1e1e1] cursor-pointer text-center"
                   onClick={() => handleSort('deduction')}
                 >
                   Deduction
@@ -548,7 +586,7 @@ const Feedback: React.FC<FeedbackProps> = ({
                   )}
                 </TableHead>
                 <TableHead 
-                  className="w-[80px] text-[#e1e1e1] cursor-pointer"
+                  className="w-[60px] text-[#e1e1e1] cursor-pointer"
                   onClick={() => handleSort('applied')}
                 >
                   Apply
@@ -558,7 +596,7 @@ const Feedback: React.FC<FeedbackProps> = ({
                     </span>
                   )}
                 </TableHead>
-                <TableHead className="w-[100px] text-[#e1e1e1]">Actions</TableHead>
+                <TableHead className="w-[80px] text-[#e1e1e1]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -632,6 +670,10 @@ const Feedback: React.FC<FeedbackProps> = ({
             Add Feedback
           </Button>
         )}
+      </div>
+      <div className="file-info">
+        <span>File: {fileName || 'No file selected'}</span>
+        <span>Max Points: {maxPoints}</span>
       </div>
     </div>
   );
