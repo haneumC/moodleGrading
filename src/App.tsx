@@ -87,7 +87,7 @@ const MainApp = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [assignmentName, setAssignmentName] = useState<string>("Assignment 1");
-  const [maxPoints, setMaxPoints] = useState<string>("20.00");
+  const [maxPoints, setMaxPoints] = useState<number>(20);
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(defaultFeedback);
   
   const [changeHistory, setChangeHistory] = useState<ChangeRecord[]>([]);
@@ -109,7 +109,7 @@ const MainApp = () => {
         // Set max points first
         if (parsedData.maxPoints) {
           console.log('Setting max points from URL:', parsedData.maxPoints);
-          setMaxPoints(parsedData.maxPoints);
+          setMaxPoints(parseFloat(parsedData.maxPoints));
         }
         
         // Set assignment name
@@ -157,7 +157,7 @@ const MainApp = () => {
             // Set max points first
             const maxPointsValue = parsedData.maxPoints || '20.00';
             console.log('Setting max points from storage:', maxPointsValue);
-            setMaxPoints(maxPointsValue);
+            setMaxPoints(parseFloat(maxPointsValue));
             
             if (parsedData.students && Array.isArray(parsedData.students)) {
               console.log('Found valid students array:', parsedData.students);
@@ -423,7 +423,7 @@ const MainApp = () => {
             onChange={(e) => setAssignmentName(e.target.value)}
             className="text-lg font-semibold px-2 py-1 border rounded"
           />
-          <p>Max Points: {maxPoints}</p>
+          <p>Max Points: {maxPoints.toFixed(2)}</p>
         </div>
       </header>
       <main>
@@ -467,6 +467,7 @@ const MainApp = () => {
             onLastAutoSaveTimeUpdate={setLastAutoSaveTime}
             selectedFeedbackId={selectedFeedbackId}
             onFileHandleCreated={setFileHandle}
+            setMaxPoints={setMaxPoints}
           />
         </div>
       </main>

@@ -7,7 +7,8 @@ export const useCSVHandling = (
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>,
   assignmentName: string,
   students: Student[],
-  onChangeTracked?: (change: ChangeRecord) => void
+  onChangeTracked?: (change: ChangeRecord) => void,
+  setMaxPoints?: (maxPoints: number) => void
 ) => {
   const [error, setError] = useState<string>("");
 
@@ -25,6 +26,7 @@ export const useCSVHandling = (
         "Last modified (submission)",
         "Grade",
         "Feedback comments",
+        "Maximum Grade"
       ];
 
       const missingHeaders = requiredHeaders.filter((header) => !headerRow.includes(header));
@@ -43,8 +45,25 @@ export const useCSVHandling = (
 
   const processCSVData = (csvData: string[][]): Student[] => {
     const headerRow = csvData[0];
+    let maxGradeFound = '';
     
-    return csvData.slice(1).map(row => {
+    // Find the index of the Maximum Grade column
+    const maxGradeIndex = headerRow.findIndex(header => header === 'Maximum Grade');
+    console.log('Maximum Grade column index:', maxGradeIndex);
+    
+    // Get the first non-empty maximum grade value from the data rows
+    if (maxGradeIndex !== -1) {
+      for (let i = 1; i < csvData.length; i++) {
+        const row = csvData[i];
+        if (row[maxGradeIndex] && row[maxGradeIndex].trim() !== '') {
+          maxGradeFound = row[maxGradeIndex].trim();
+          console.log('Found maximum grade value:', maxGradeFound);
+          break;
+        }
+      }
+    }
+    
+    const processedStudents = csvData.slice(1).map(row => {
       const student: Student = {
         name: '',
         email: '',
@@ -61,13 +80,28 @@ export const useCSVHandling = (
           case 'Email address': student.email = value; break;
           case 'Grade': student.grade = value; break;
           case 'Feedback comments': student.feedback = value; break;
-          case 'Maximum Grade': student.maxGrade = value; break;
-          // Add other fields as needed
+          case 'Maximum Grade': 
+            student.maxGrade = value;
+            break;
         }
       });
 
       return student;
     });
+
+    // Update the max points in the parent component if we found a value
+    if (maxGradeFound && setMaxPoints) {
+      console.log('Setting max points from CSV:', maxGradeFound);
+      const numericValue = parseFloat(maxGradeFound);
+      console.log('Parsed numeric value:', numericValue);
+      if (!isNaN(numericValue)) {
+        setMaxPoints(numericValue);
+      } else {
+        console.warn('Invalid maximum points value:', maxGradeFound);
+      }
+    }
+
+    return processedStudents;
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {

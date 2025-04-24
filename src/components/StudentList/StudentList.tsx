@@ -65,6 +65,7 @@ const StudentList: React.FC<{
   onLastAutoSaveTimeUpdate: (time: string) => void;
   selectedFeedbackId: number | null;
   onFileHandleCreated: (handle: FileSystemFileHandle) => void;
+  setMaxPoints: React.Dispatch<React.SetStateAction<number>>;
 }> = ({
   students,
   setStudents,
@@ -79,7 +80,8 @@ const StudentList: React.FC<{
   setFeedbackItems,
   onLastAutoSaveTimeUpdate,
   selectedFeedbackId,
-  onFileHandleCreated
+  onFileHandleCreated,
+  setMaxPoints
 }) => {
   console.log('StudentList received students:', students);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -100,7 +102,8 @@ const StudentList: React.FC<{
     setStudents, 
     assignmentName, 
     students,
-    onChangeTracked
+    onChangeTracked,
+    setMaxPoints
   );
 
   // Wrap the original handleFileChange to set isNewImport
