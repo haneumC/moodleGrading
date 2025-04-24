@@ -56,9 +56,14 @@ export const useCSVHandling = (
       for (let i = 1; i < csvData.length; i++) {
         const row = csvData[i];
         if (row[maxGradeIndex] && row[maxGradeIndex].trim() !== '') {
-          maxGradeFound = row[maxGradeIndex].trim();
-          console.log('Found maximum grade value:', maxGradeFound);
-          break;
+          const rawValue = row[maxGradeIndex].trim();
+          // Try to parse the value, removing any non-numeric characters except decimal point
+          const cleanedValue = rawValue.replace(/[^\d.]/g, '');
+          if (cleanedValue) {
+            maxGradeFound = cleanedValue;
+            console.log('Found maximum grade value:', maxGradeFound);
+            break;
+          }
         }
       }
     }
@@ -80,9 +85,12 @@ export const useCSVHandling = (
           case 'Email address': student.email = value; break;
           case 'Grade': student.grade = value; break;
           case 'Feedback comments': student.feedback = value; break;
-          case 'Maximum Grade': 
-            student.maxGrade = value;
+          case 'Maximum Grade': {
+            // Clean and validate the max grade value
+            const cleanedGrade = value.trim().replace(/[^\d.]/g, '');
+            student.maxGrade = cleanedGrade || maxGradeFound;
             break;
+          }
         }
       });
 
@@ -93,12 +101,15 @@ export const useCSVHandling = (
     if (maxGradeFound && setMaxPoints) {
       console.log('Setting max points from CSV:', maxGradeFound);
       const numericValue = parseFloat(maxGradeFound);
-      console.log('Parsed numeric value:', numericValue);
-      if (!isNaN(numericValue)) {
+      if (!isNaN(numericValue) && numericValue > 0) {
+        console.log('Setting valid max points value:', numericValue);
         setMaxPoints(numericValue);
       } else {
         console.warn('Invalid maximum points value:', maxGradeFound);
+        setError("Invalid maximum points value in CSV");
       }
+    } else {
+      console.warn('No valid maximum grade value found in CSV');
     }
 
     return processedStudents;
