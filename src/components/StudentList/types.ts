@@ -8,7 +8,7 @@ export interface Student {
   appliedIds: number[];
   identifier?: string;
   idNumber?: string;
-  maxGrade: string;
+  maxGrade?: string;
   gradeCanBeChanged?: string;
   onlineText?: string;
   lastModifiedGrade?: string;
