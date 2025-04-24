@@ -398,7 +398,7 @@ const StudentList: React.FC<{
                 }
               }}
               onClick={(e) => e.stopPropagation()}
-              className="table-container"
+              className="h-4 w-4 rounded border-gray-500 bg-transparent checked:bg-blue-600 checked:border-blue-600 focus:ring-0 focus:ring-offset-0 cursor-pointer"
             />
           );
         },
