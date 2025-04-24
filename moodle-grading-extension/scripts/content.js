@@ -9,7 +9,7 @@ function isGradingPage() {
 function collectGradingData() {
   const data = {
     assignmentName: '',
-    maxPoints: '20.00',
+    maxPoints: '0',
     studentData: []
   };
 
@@ -19,18 +19,34 @@ function collectGradingData() {
     data.assignmentName = assignmentTitle.textContent.trim();
   }
 
-  // Get max points from the first grade input's parent cell
-  const firstGradeCell = document.querySelector('input[id*="quickgrade"]')?.closest('td');
-  if (firstGradeCell) {
-    const maxPointsText = firstGradeCell.textContent;
-    const match = maxPointsText.match(/\/\s*(\d+(?:\.\d+)?)/);
-    if (match) {
-      data.maxPoints = match[1];
+  // Get all student rows
+  const rows = document.querySelectorAll('table.generaltable > tbody > tr');
+  
+  // Get max points from the first student's grade input
+  const firstRow = rows[0];
+  if (firstRow) {
+    // Try to find the grade input and its container
+    const gradeCell = firstRow.querySelector('td:has(input[id*="quickgrade"]), td:has(input[id*="grade_"])');
+    if (gradeCell) {
+      // Look for the max points in the cell text (format: "Grade / X.XX")
+      const cellText = gradeCell.textContent.trim();
+      const maxPointsMatch = cellText.match(/\/\s*(\d+(?:\.\d+)?)/);
+      if (maxPointsMatch) {
+        data.maxPoints = maxPointsMatch[1];
+        console.log('Found max points:', data.maxPoints);
+      } else {
+        // Fallback: try to find it in any label or text that contains a fraction
+        const fractionMatch = cellText.match(/(\d+(?:\.\d+)?)\s*$/);
+        if (fractionMatch) {
+          data.maxPoints = fractionMatch[1];
+          console.log('Found max points (fallback):', data.maxPoints);
+        }
+      }
     }
   }
 
-  // Get all student rows
-  const rows = document.querySelectorAll('table.generaltable > tbody > tr');
+  console.log('Collected max points:', data.maxPoints);
+
   rows.forEach(row => {
     try {
       // Get name from first cell
@@ -74,8 +90,7 @@ function collectGradingData() {
           email: emailText,
           grade: gradeText,
           feedback: feedbackText,
-          appliedIds: [],
-          maxGrade: data.maxPoints
+          appliedIds: []
         });
       }
     } catch (err) {
@@ -193,8 +208,7 @@ function launchGradingAssistant() {
         email: student.email,
         grade: student.grade || '',
         feedback: student.feedback || '',
-        appliedIds: [],
-        maxGrade: student.maxGrade
+        appliedIds: []
       })),
       timestamp: new Date().toISOString()
     };

@@ -87,6 +87,7 @@ const MainApp = () => {
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [assignmentName, setAssignmentName] = useState<string>("Assignment 1");
+  const [maxPoints, setMaxPoints] = useState<string>("20.00");
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(defaultFeedback);
   
   const [changeHistory, setChangeHistory] = useState<ChangeRecord[]>([]);
@@ -96,13 +97,60 @@ const MainApp = () => {
   const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
 
   useEffect(() => {
-    // Check chrome.storage.local for data
+    // First try to get data from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const dataParam = urlParams.get('data');
+    
+    if (dataParam) {
+      try {
+        const parsedData = JSON.parse(decodeURIComponent(dataParam));
+        console.log('Found URL data:', parsedData);
+        
+        if (parsedData.maxPoints) {
+          console.log('Setting max points from URL:', parsedData.maxPoints);
+          setMaxPoints(parsedData.maxPoints);
+        }
+        
+        if (parsedData.assignmentName) {
+          setAssignmentName(parsedData.assignmentName);
+        }
+        
+        if (parsedData.students && Array.isArray(parsedData.students)) {
+          const transformedStudents = parsedData.students.map((student: MoodleStudent) => ({
+            name: student.name || '',
+            email: student.email || '',
+            grade: student.grade || '',
+            feedback: student.feedback || '',
+            appliedIds: student.appliedIds || [],
+            identifier: student.idNumber || '',
+            idNumber: student.idNumber || '',
+            status: student.status || '',
+            lastModifiedSubmission: student.lastModifiedSubmission || '',
+            onlineText: student.onlineText || '',
+            lastModifiedGrade: student.lastModifiedGrade || '',
+            maxGrade: parsedData.maxPoints || '20.00',
+            gradeCanBeChanged: student.gradeCanBeChanged || 'Yes'
+          }));
+          
+          setStudents(transformedStudents);
+        }
+      } catch (error) {
+        console.error('Error parsing URL data:', error);
+      }
+    }
+
+    // Then check chrome.storage.local for data
     if (window.chrome?.storage?.local) {
       window.chrome.storage.local.get(['moodleGradingData'], (result) => {
         if (result.moodleGradingData) {
           try {
             const parsedData = result.moodleGradingData;
             console.log('Found Moodle data:', parsedData);
+            
+            if (parsedData.maxPoints) {
+              console.log('Setting max points from storage:', parsedData.maxPoints);
+              setMaxPoints(parsedData.maxPoints);
+            }
             
             if (parsedData.students && Array.isArray(parsedData.students)) {
               console.log('Found valid students array:', parsedData.students);
@@ -119,7 +167,7 @@ const MainApp = () => {
                 lastModifiedSubmission: student.lastModifiedSubmission || '',
                 onlineText: student.onlineText || '',
                 lastModifiedGrade: student.lastModifiedGrade || '',
-                maxGrade: student.maxGrade || parsedData.maxPoints || '20.00',
+                maxGrade: parsedData.maxPoints || '20.00',
                 gradeCanBeChanged: student.gradeCanBeChanged || 'Yes'
               }));
               
@@ -368,7 +416,7 @@ const MainApp = () => {
             onChange={(e) => setAssignmentName(e.target.value)}
             className="text-lg font-semibold px-2 py-1 border rounded"
           />
-          <p>Max Points: {students.length > 0 ? (students[0]?.maxGrade || '20.00') : '-'}</p>
+          <p>Max Points: {maxPoints}</p>
         </div>
       </header>
       <main>
