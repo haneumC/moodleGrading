@@ -21,6 +21,7 @@ interface MoodleMessage {
   type: 'MOODLE_DATA';
   data: {
     assignmentName: string;
+    maxPoints: string;
     students: MoodleStudent[];
     timestamp: string;
   };
@@ -29,6 +30,7 @@ interface MoodleMessage {
 interface StorageData {
   moodleGradingData?: {
     assignmentName: string;
+    maxPoints: string;
     students: MoodleStudent[];
     timestamp: string;
   };
@@ -117,7 +119,7 @@ const MainApp = () => {
                 lastModifiedSubmission: student.lastModifiedSubmission || '',
                 onlineText: student.onlineText || '',
                 lastModifiedGrade: student.lastModifiedGrade || '',
-                maxGrade: student.maxGrade || '20.00',
+                maxGrade: student.maxGrade || parsedData.maxPoints || '20.00',
                 gradeCanBeChanged: student.gradeCanBeChanged || 'Yes'
               }));
               

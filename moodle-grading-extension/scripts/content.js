@@ -9,6 +9,7 @@ function isGradingPage() {
 function collectGradingData() {
   const data = {
     assignmentName: '',
+    maxPoints: '20.00',
     studentData: []
   };
 
@@ -16,6 +17,16 @@ function collectGradingData() {
   const assignmentTitle = document.querySelector('.page-header-headings h1');
   if (assignmentTitle) {
     data.assignmentName = assignmentTitle.textContent.trim();
+  }
+
+  // Get max points from the first grade input's parent cell
+  const firstGradeCell = document.querySelector('input[id*="quickgrade"]')?.closest('td');
+  if (firstGradeCell) {
+    const maxPointsText = firstGradeCell.textContent;
+    const match = maxPointsText.match(/\/\s*(\d+(?:\.\d+)?)/);
+    if (match) {
+      data.maxPoints = match[1];
+    }
   }
 
   // Get all student rows
@@ -63,7 +74,8 @@ function collectGradingData() {
           email: emailText,
           grade: gradeText,
           feedback: feedbackText,
-          appliedIds: []
+          appliedIds: [],
+          maxGrade: data.maxPoints
         });
       }
     } catch (err) {
@@ -175,12 +187,14 @@ function launchGradingAssistant() {
 
     const storageData = {
       assignmentName: data.assignmentName,
+      maxPoints: data.maxPoints,
       students: data.studentData.map(student => ({
         name: student.name,
         email: student.email,
         grade: student.grade || '',
         feedback: student.feedback || '',
-        appliedIds: []
+        appliedIds: [],
+        maxGrade: student.maxGrade
       })),
       timestamp: new Date().toISOString()
     };
