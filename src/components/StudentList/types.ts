@@ -35,12 +35,17 @@ export interface StudentListProps {
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   selectedStudent: string | null;
   onStudentSelect: (student: string | null) => void;
+  selectedStudents: Set<string>;
+  setSelectedStudents: React.Dispatch<React.SetStateAction<Set<string>>>;
   assignmentName: string;
   setAssignmentName: (name: string) => void;
   feedbackItems: FeedbackItem[];
   setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
   onChangeTracked: (change: ChangeRecord) => void;
   onSaveProgress?: () => Promise<boolean>;
+  onLastAutoSaveTimeUpdate: (time: string) => void;
+  selectedFeedbackId: number | null;
+  onFileHandleCreated: (handle: FileSystemFileHandle) => void;
 }
 
 export interface SaveData {

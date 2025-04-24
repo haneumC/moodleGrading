@@ -20,7 +20,9 @@ const TableHeaderComponent: React.FC<TableHeaderProps> = ({ headerGroups }) => {
                 className="header-cell cursor-pointer"
               >
                 {flexRender(header.column.columnDef.header, header.getContext())}{" "}
-                {header.column.getIsSorted() ? (header.column.getIsSorted() === "desc" ? "▲" : "▼") : "⇅"}
+                {header.column.id !== 'select' && header.column.getIsSorted() ? (
+                  header.column.getIsSorted() === "desc" ? "▲" : "▼"
+                ) : header.column.id !== 'select' ? "⇅" : ""}
               </TableHead>
             ))}
           </React.Fragment>

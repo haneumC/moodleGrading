@@ -5,24 +5,33 @@ import { Student } from '../../StudentList/types';
 
 interface TableBodyProps {
   rows: Row<Student>[];
-  selectedStudent: string | null;
   onStudentSelect: (student: string) => void;
   selectedFeedbackId: number | null;
-  onStudentModified: () => void;
+  selectedStudents: Set<string>;
+  setSelectedStudents: React.Dispatch<React.SetStateAction<Set<string>>>;
 }
 
 const TableBodyComponent: React.FC<TableBodyProps> = ({ 
   rows, 
-  selectedStudent, 
   onStudentSelect,
   selectedFeedbackId,
-  onStudentModified
+  selectedStudents,
+  setSelectedStudents
 }) => {
-  console.log('TableBody received selectedFeedbackId:', selectedFeedbackId);
-  
   const handleRowClick = (student: Student) => {
+    // If more than one student is selected, don't change selection on row click
+    if (selectedStudents.size > 1) {
+      return;
+    }
+
+    // If clicking on the currently selected student, do nothing
+    if (selectedStudents.has(student.name)) {
+      return;
+    }
+
+    // Clear previous selection and select the new student
+    setSelectedStudents(new Set([student.name]));
     onStudentSelect(student.name);
-    onStudentModified();
   };
 
   return (
@@ -35,17 +44,14 @@ const TableBodyComponent: React.FC<TableBodyProps> = ({
       <TableBody>
         {rows.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={4} className="text-center">
+            <TableCell colSpan={5} className="text-center">
               No data available
             </TableCell>
           </TableRow>
         ) : (
           rows.map((row) => {
-            const student = row.original;
-            const isSelected = student.name === selectedStudent;
-            
-            // Debug: Check if student has appliedIds array
-            console.log(`Student ${student.name} appliedIds:`, student.appliedIds);
+            const student = row.original as Student;
+            const isSelected = selectedStudents.has(student.name);
             
             // Make sure appliedIds is an array before checking includes
             const studentAppliedIds = Array.isArray(student.appliedIds) ? student.appliedIds : [];
@@ -54,13 +60,11 @@ const TableBodyComponent: React.FC<TableBodyProps> = ({
             const hasFeedbackApplied = selectedFeedbackId !== null && 
               studentAppliedIds.includes(selectedFeedbackId);
             
-            console.log(`Student ${student.name} has feedback ${selectedFeedbackId} applied:`, hasFeedbackApplied);
-            
-            let rowClassName = 'cursor-pointer ';
+            let rowClassName = 'cursor-pointer hover:bg-[#2d2d2d] transition-colors ';
             if (isSelected) {
-              rowClassName += 'selected bg-blue-900 hover:bg-blue-800';
+              rowClassName += 'bg-[#2d4a3e]';
             } else if (hasFeedbackApplied) {
-              rowClassName += 'bg-green-900 hover:bg-green-800 student-with-feedback'; // Add the CSS class
+              rowClassName += 'bg-green-900 hover:bg-green-800 student-with-feedback';
             } else {
               rowClassName += 'hover:bg-gray-800';
             }
@@ -72,7 +76,7 @@ const TableBodyComponent: React.FC<TableBodyProps> = ({
                 onClick={() => handleRowClick(student)}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className={cell.column.id === 'select' ? 'w-10' : ''}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

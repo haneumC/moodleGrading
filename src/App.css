@@ -145,3 +145,40 @@ button:focus-visible {
   color: #888;
   margin-top: 4px;
 }
+
+.table-container input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #ffffff;
+  border-radius: 3px;
+  background-color: transparent;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.table-container input[type="checkbox"]:checked {
+  background-color: #4a5dab;
+  border-color: #4a5dab;
+}
+
+.table-container input[type="checkbox"]:checked::after {
+  content: "✓";
+  position: absolute;
+  color: white;
+  font-size: 12px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.table-container input[type="checkbox"]:hover {
+  border-color: #687aef;
+}
+
+/* Hide sort arrows for checkbox column */
+.table-container th:first-child [class*="cursor-pointer"]::after {
+  display: none !important;
+}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { FeedbackItem } from '@/components/StudentList/types';
-import { FeedbackProps } from './types';
+import { FeedbackItem, SortField, SortDirection, FeedbackProps } from './types';
 import {
   DndContext,
   closestCenter,
@@ -21,8 +20,6 @@ import {
   useSensor,
   useSensors,
   DragEndEvent,
-  DragStartEvent,
-  DragCancelEvent,
   MeasuringStrategy,
 } from '@dnd-kit/core';
 import {
@@ -38,10 +35,7 @@ import {
   restrictToParentElement,
 } from '@dnd-kit/modifiers';
 import { Search, X } from 'lucide-react';
-
-// Define types for sorting
-type SortField = 'text' | 'deduction' | 'applied';
-type SortDirection = 'asc' | 'desc';
+import { ChangeRecord } from '@/components/StudentList/types';
 
 interface SortableItemProps {
   id: number;
@@ -51,6 +45,7 @@ interface SortableItemProps {
   editingDeduction: number;
   appliedIds: number[];
   selectedStudent: string | null;
+  selectedStudents: Set<string>;
   onStartEdit: (item: FeedbackItem) => void;
   onAcceptEdit: (id: number) => void;
   onRejectEdit: () => void;
@@ -70,6 +65,7 @@ const SortableItem = ({
   editingDeduction,
   appliedIds,
   selectedStudent,
+  selectedStudents,
   onStartEdit,
   onAcceptEdit,
   onRejectEdit,
@@ -87,7 +83,6 @@ const SortableItem = ({
     transform,
     transition,
     isDragging,
-    isSorting,
   } = useSortable({ 
     id,
     data: {
@@ -104,12 +99,13 @@ const SortableItem = ({
   } as React.CSSProperties;
 
   const isSelected = selectedFeedbackId === item.id;
+  const hasSelectedStudents = selectedStudent || (selectedStudents && selectedStudents.size > 0);
 
   return (
     <TableRow 
       ref={setNodeRef} 
       style={style} 
-      className={`${isDragging ? 'dragging' : ''} border-b-0 hover:bg-[#252525] transition-colors`}
+      className={`${isDragging ? 'dragging' : ''} border-b-0 hover:bg-[#252525] transition-colors mb-1`}
       data-is-dragging={isDragging || undefined}
       data-feedback-id={id}
     >
@@ -169,8 +165,9 @@ const SortableItem = ({
               onClick={(e) => {
                 if (e.target === e.currentTarget) {
                   e.stopPropagation();
-                  console.log('Clicking on feedback div:', item.id);
-                  onFeedbackSelect && onFeedbackSelect(item.id);
+                  if (onFeedbackSelect) {
+                    onFeedbackSelect(item.id);
+                  }
                 }
               }}
             >
@@ -182,12 +179,6 @@ const SortableItem = ({
                 aria-label="Drag handle"
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    // This triggers the keyboard drag handling
-                  }
-                }}
               >
                 <i className="bi bi-grip-vertical text-gray-500"></i>
               </div>
@@ -197,9 +188,8 @@ const SortableItem = ({
                   e.stopPropagation();
                   if (e.ctrlKey || e.metaKey) {
                     onStartEdit(item);
-                  } else {
-                    console.log('Clicking on feedback text:', item.id);
-                    onFeedbackSelect && onFeedbackSelect(item.id);
+                  } else if (onFeedbackSelect) {
+                    onFeedbackSelect(item.id);
                   }
                 }}
               >
@@ -217,15 +207,19 @@ const SortableItem = ({
             <Button
               variant="ghost"
               size="icon"
-              disabled={!selectedStudent}
-              onClick={() => onApplyFeedback(item)}
+              disabled={!hasSelectedStudents}
+              onClick={() => {
+                if (hasSelectedStudents) {
+                  onApplyFeedback(item);
+                }
+              }}
               className={`w-5 h-5 rounded-full ${
-                selectedStudent && appliedIds.includes(item.id)
+                hasSelectedStudents && appliedIds.includes(item.id)
                   ? 'bg-white shadow-sm' 
                   : 'border border-gray-400 hover:border-gray-300'
               }`}
             >
-              {selectedStudent && appliedIds.includes(item.id) ? (
+              {hasSelectedStudents && appliedIds.includes(item.id) ? (
                 <i className="bi bi-check text-black"></i>
               ) : (
                 <span></span>
@@ -264,6 +258,7 @@ const fadeOutClass = "opacity-0 transform -translate-y-2 transition-all duration
 
 const Feedback: React.FC<FeedbackProps> = ({ 
   selectedStudent, 
+  selectedStudents,
   appliedIds, 
   onFeedbackEdit,
   feedbackItems,
@@ -286,10 +281,6 @@ const Feedback: React.FC<FeedbackProps> = ({
   const [reusableIds, setReusableIds] = useState<number[]>([]);
   const [nextId, setNextId] = useState<number>(5);
   const [useManualOrder, setUseManualOrder] = useState(false);
-  const [fileName, setFileName] = useState<string>('');
-  const [maxPoints, setMaxPoints] = useState<number>(20);
-  const [activeId, setActiveId] = useState<number | null>(null);
-  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [searchResults, setSearchResults] = useState<FeedbackItem[]>([]);
   const [isSearching, setIsSearching] = useState<boolean>(false);
@@ -310,74 +301,69 @@ const Feedback: React.FC<FeedbackProps> = ({
   );
 
   const handleApplyFeedback = (feedbackItem: FeedbackItem) => {
-    if (!selectedStudent) return;
-
     onStudentsUpdate(prevStudents =>
       prevStudents.map(student => {
-        if (student.name === selectedStudent) {
-          const oldState = { ...student };
-          
-          const currentAppliedIds = Array.isArray(student.appliedIds) ? student.appliedIds : [];
-          
-          if (currentAppliedIds.includes(feedbackItem.id)) {
-            const feedbackLines = student.feedback
-              .split('\n\n')
-              .filter(line => !line.trim().startsWith(`${feedbackItem.comment.trim()}`))
-              .filter(line => line.trim() !== '')
-              .join('\n\n');
+        if (selectedStudents.has(student.name) || student.name === selectedStudent) {
+          const appliedIds = Array.isArray(student.appliedIds) ? student.appliedIds : [];
+          const isAlreadyApplied = appliedIds.includes(feedbackItem.id);
 
-            const remainingIds = currentAppliedIds.filter(id => id !== feedbackItem.id);
-            const newState = {
-              ...student,
-              grade: remainingIds.length === 0 ? "" : (20 - feedbackItem.grade).toString(),
-              feedback: feedbackLines || "",
-              appliedIds: remainingIds,
-            };
+          let newAppliedIds: number[];
+          let newFeedback: string;
+          let newGrade: string;
 
-            onChangeTracked({
-              type: 'feedback',
-              studentName: student.name,
-              oldValue: oldState,
-              newValue: newState,
-              timestamp: new Date().toISOString()
-            });
-
-            return newState;
+          if (isAlreadyApplied) {
+            // Remove the feedback
+            newAppliedIds = appliedIds.filter(id => id !== feedbackItem.id);
+            newFeedback = student.feedback
+              .split('\n')
+              .filter(line => !line.trim().startsWith(feedbackItem.comment.trim()))
+              .join('\n');
           } else {
-            const newAppliedIds = [...currentAppliedIds, feedbackItem.id];
-            const newGrade = (20 - feedbackItem.grade).toString();
-            const formattedFeedback = `${feedbackItem.comment.trim()}`;
-            const newFeedback = student.feedback
-              ? `${student.feedback.trim()}\n\n${formattedFeedback}`
-              : formattedFeedback;
-
-            const newState = {
-              ...student,
-              grade: newGrade,
-              feedback: newFeedback,
-              appliedIds: newAppliedIds,
-            };
-
-            console.log(`Applied feedback ${feedbackItem.id} to student ${student.name}`, newState);
-
-            onChangeTracked({
-              type: 'feedback',
-              studentName: student.name,
-              oldValue: oldState,
-              newValue: newState,
-              timestamp: new Date().toISOString()
-            });
-
-            return newState;
+            // Add the feedback
+            newAppliedIds = [...appliedIds, feedbackItem.id];
+            newFeedback = student.feedback
+              ? `${student.feedback}\n${feedbackItem.comment}`
+              : feedbackItem.comment;
           }
+
+          // Calculate total deduction from all applied feedback items
+          const totalDeduction = newAppliedIds.reduce((sum, id) => {
+            const feedback = feedbackItems.find(f => f.id === id);
+            return sum + (feedback?.grade || 0);
+          }, 0);
+
+          const maxPoints = parseFloat(student.maxGrade || '20.00');
+          const calculatedGrade = Math.max(0, maxPoints - totalDeduction);
+          
+          // Set grade to blank if no feedback is applied
+          newGrade = newAppliedIds.length > 0 ? calculatedGrade.toString() : '';
+
+          const oldState = {
+            grade: student.grade,
+            feedback: student.feedback,
+            appliedIds: [...appliedIds]
+          };
+
+          const newState = {
+            ...student,
+            grade: newGrade,
+            feedback: newFeedback.trim(),
+            appliedIds: newAppliedIds
+          };
+
+          onChangeTracked({
+            type: 'feedback',
+            studentName: student.name,
+            oldValue: oldState,
+            newValue: newState,
+            timestamp: new Date().toISOString()
+          });
+
+          return newState;
         }
         return student;
       })
     );
-    
-    if (window.markGradingChanges) {
-      window.markGradingChanges();
-    }
   };
 
   const handleAddFeedback = () => {
@@ -385,12 +371,9 @@ const Feedback: React.FC<FeedbackProps> = ({
       let idToUse: number;
       
       if (reusableIds.length > 0) {
-        // Use the smallest available reused id
         idToUse = Math.min(...reusableIds);
-        // Remove the used id from reusableIds
         setReusableIds(prev => prev.filter(id => id !== idToUse));
       } else {
-        // Use the next sequential id
         idToUse = nextId;
         setNextId(prev => prev + 1);
       }
@@ -429,7 +412,6 @@ const Feedback: React.FC<FeedbackProps> = ({
         : item
     ));
 
-    // Notify parent component about the edit if this feedback was applied to any student
     if (oldFeedback && appliedIds.includes(id)) {
       onFeedbackEdit(oldFeedback, newFeedback);
     }
@@ -442,28 +424,23 @@ const Feedback: React.FC<FeedbackProps> = ({
   };
 
   const handleDeleteFeedback = (id: number) => {
-    // Get the feedback item before deleting it
     const feedbackToDelete = feedbackItems.find(item => item.id === id);
     
     if (feedbackToDelete) {
-      // Update students who have this feedback applied
       onStudentsUpdate(prevStudents =>
         prevStudents.map(student => {
           if (student.appliedIds?.includes(id)) {
             const oldState = { ...student };
             
-            // Remove the feedback text with the correct format
             const feedbackLines = student.feedback
               .split('\n\n')
-              .filter(line => !line.trim().startsWith(`${feedbackToDelete.grade}: ${feedbackToDelete.comment.trim()}`))
-              .filter(line => line.trim() !== '')
+              .filter((line: string) => !line.trim().startsWith(`${feedbackToDelete.grade}: ${feedbackToDelete.comment.trim()}`))
+              .filter((line: string) => line.trim() !== '')
               .join('\n\n');
 
-            // Remove the id from appliedIds
-            const newAppliedIds = student.appliedIds.filter(appliedId => appliedId !== id);
+            const newAppliedIds = student.appliedIds.filter((appliedId: number) => appliedId !== id);
             
-            // Recalculate grade based on remaining feedback
-            const remainingDeduction = newAppliedIds.reduce((sum, appliedId) => {
+            const remainingDeduction = newAppliedIds.reduce((sum: number, appliedId: number) => {
               const feedback = feedbackItems.find(f => f.id === appliedId);
               return sum + (feedback?.grade || 0);
             }, 0);
@@ -475,7 +452,6 @@ const Feedback: React.FC<FeedbackProps> = ({
               appliedIds: newAppliedIds,
             };
 
-            // Track the change
             onChangeTracked({
               type: 'feedback',
               studentName: student.name,
@@ -491,18 +467,15 @@ const Feedback: React.FC<FeedbackProps> = ({
       );
     }
 
-    // Now remove the feedback item itself
     setReusableIds(prev => [...prev, id]);
     setFeedbackItems(feedbackItems.filter(item => item.id !== id));
   };
 
   const getSortedFeedbackItems = () => {
-    // If we're using manual ordering, just return the items as they are
     if (useManualOrder) {
       return feedbackItems;
     }
     
-    // Otherwise, sort them as before
     return [...feedbackItems].sort((a, b) => {
       if (sortField === 'text') {
         const commentA = a.comment || '';
@@ -516,7 +489,6 @@ const Feedback: React.FC<FeedbackProps> = ({
           ? a.grade - b.grade
           : b.grade - a.grade;
       }
-      // sorting for applied field - ensure we're using the correct property
       const aApplied = appliedIds.includes(a.id) ? 1 : 0;
       const bApplied = appliedIds.includes(b.id) ? 1 : 0;
       return sortDirection === 'asc' 
@@ -526,116 +498,51 @@ const Feedback: React.FC<FeedbackProps> = ({
   };
 
   const handleSort = (field: SortField) => {
-    // Switch to sorting mode
     setUseManualOrder(false);
     
     if (sortField === field) {
-      setSortDirection(current => current === 'asc' ? 'desc' : 'asc');
+      setSortDirection((current: SortDirection) => current === 'asc' ? 'desc' : 'asc');
     } else {
       setSortField(field);
       setSortDirection('asc');
     }
   };
 
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    
-    setActiveId(Number(active.id));
-    setIsDragging(true);
-    
-    // Play an optional sound or provide haptic feedback here if needed
-    console.log('Started dragging item', active.id);
+  const handleDragStart = () => {
+    // No need to do anything here
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
-    
-    setIsDragging(false);
-    setActiveId(null);
-    
-    if (!over) {
-      console.log('Drag ended but not over a valid target');
-      return;
-    }
-    
-    if (active.id !== over.id) {
-      // Switch to manual ordering mode
-      setUseManualOrder(true);
+    if (over && active.id !== over.id) {
+      const oldIndex = feedbackItems.findIndex(item => item.id === active.id);
+      const newIndex = feedbackItems.findIndex(item => item.id === over.id);
       
-      setFeedbackItems((prevItems: FeedbackItem[]) => {
-        try {
-          const activeId = Number(active.id);
-          const overId = Number(over.id);
-          
-          const oldIndex = prevItems.findIndex((item: FeedbackItem) => item.id === activeId);
-          const newIndex = prevItems.findIndex((item: FeedbackItem) => item.id === overId);
-          
-          if (oldIndex === -1 || newIndex === -1) {
-            console.error('Item not found during drag', { activeId, overId, oldIndex, newIndex });
-            return prevItems; // Return unchanged if indexes can't be found
-          }
-          
-          return arrayMove([...prevItems], oldIndex, newIndex);
-        } catch (error) {
-          console.error('Error during drag operation:', error);
-          return prevItems; // Return unchanged on error
-        }
-      });
+      const newItems = arrayMove(feedbackItems, oldIndex, newIndex);
+      setFeedbackItems(newItems);
+      
+      const changeRecord: ChangeRecord = {
+        type: 'feedback',
+        timestamp: new Date().toISOString(),
+        message: 'Feedback items reordered',
+        oldValue: '',
+        newValue: '',
+        studentName: ''
+      };
+      onChangeTracked(changeRecord);
     }
   };
 
-  const handleDragCancel = (event: DragCancelEvent) => {
-    setIsDragging(false);
-    setActiveId(null);
+  const handleDragCancel = () => {
     console.log('Drag was cancelled');
   };
 
   const handleFeedbackSelect = (feedbackId: number) => {
-    console.log('Feedback selected:', feedbackId);
     if (onFeedbackSelect) {
       onFeedbackSelect(feedbackId);
     }
   };
 
-  const sortedItems = getSortedFeedbackItems();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      // existing file handling logic...
-    }
-  };
-
-  const handleLoadProgress = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    options?: { loadStudents: boolean; loadFeedback: boolean }
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setFileName(file.name); // Set the file name
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const content = event.target?.result as string;
-        const data = JSON.parse(content) as SaveData;
-
-        if (data.maxPoints) {
-          setMaxPoints(data.maxPoints); // Update max points
-        }
-
-        // existing logic to load students and feedback...
-      } catch (error) {
-        console.error('Error parsing file:', error);
-        setError("Invalid file format");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  // Function to handle search
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
     setIsSearching(!!query.trim());
@@ -657,28 +564,23 @@ const Feedback: React.FC<FeedbackProps> = ({
     }
   }, [feedbackItems]);
 
-  // Toggle search bar visibility
   const toggleSearchBar = () => {
     const newState = !isSearchBarVisible;
     setIsSearchBarVisible(newState);
     
     if (newState) {
-      // Focus the input when showing the search bar
       setTimeout(() => {
         searchInputRef.current?.focus();
       }, 10);
     } else {
-      // Clear search when hiding the search bar
       setSearchQuery('');
       setIsSearching(false);
       setSearchResults([]);
     }
   };
 
-  // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+F or Cmd+F to focus search
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setIsSearchBarVisible(true);
@@ -687,15 +589,12 @@ const Feedback: React.FC<FeedbackProps> = ({
         }, 100);
       }
       
-      // Escape to close search
       if (e.key === 'Escape') {
         if (searchQuery && isSearching) {
-          // If there's a query, first clear it
           setSearchQuery('');
           setIsSearching(false);
           setSearchResults([]);
         } else if (isSearchBarVisible) {
-          // Then close the search bar on second press
           setIsSearchBarVisible(false);
         }
       }
@@ -705,7 +604,6 @@ const Feedback: React.FC<FeedbackProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSearching, searchQuery, isSearchBarVisible]);
 
-  // Function to clear search
   const clearSearch = () => {
     setSearchQuery('');
     setIsSearching(false);
@@ -713,8 +611,9 @@ const Feedback: React.FC<FeedbackProps> = ({
     searchInputRef.current?.focus();
   };
 
-  // Determine which items to display based on search state
-  const displayItems = isSearching ? searchResults : getSortedFeedbackItems();
+  const displayItems = useMemo(() => {
+    return isSearching ? searchResults : getSortedFeedbackItems();
+  }, [isSearching, searchResults, getSortedFeedbackItems]);
 
   return (
     <div className="bg-[#1e1e1e] p-4 rounded-md h-[calc(100vh-280px)] flex flex-col mt-5">
@@ -840,6 +739,7 @@ const Feedback: React.FC<FeedbackProps> = ({
                         editingDeduction={editingDeduction}
                         appliedIds={appliedIds}
                         selectedStudent={selectedStudent}
+                        selectedStudents={selectedStudents}
                         onStartEdit={handleStartEdit}
                         onAcceptEdit={handleAcceptEdit}
                         onRejectEdit={handleRejectEdit}

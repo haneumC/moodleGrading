@@ -55,6 +55,8 @@ const StudentList: React.FC<{
   setStudents: React.Dispatch<React.SetStateAction<Student[]>>;
   selectedStudent: string | null;
   onStudentSelect: (student: string) => void;
+  selectedStudents: Set<string>;
+  setSelectedStudents: React.Dispatch<React.SetStateAction<Set<string>>>;
   assignmentName: string;
   setAssignmentName: React.Dispatch<React.SetStateAction<string>>;
   onChangeTracked: (change: ChangeRecord) => void;
@@ -68,6 +70,8 @@ const StudentList: React.FC<{
   setStudents,
   selectedStudent,
   onStudentSelect,
+  selectedStudents,
+  setSelectedStudents,
   assignmentName,
   setAssignmentName,
   onChangeTracked,
@@ -365,36 +369,82 @@ const StudentList: React.FC<{
     restoreFileHandle();
   }, []);
 
-  // Fix the date comparison
-  const columns: ColumnDef<Student>[] = [
-    { accessorKey: "name", header: "Name", cell: info => info.getValue() },
-    { accessorKey: "email", header: "Email", cell: info => info.getValue() },
-    {
-      accessorKey: "grade",
-      header: "Grade",
-      cell: info => info.getValue() || '',
-      sortingFn: (rowA, rowB) =>
-        parseInt(rowA.original.grade || '0') - parseInt(rowB.original.grade || '0'),
-    },
-    { 
-      accessorKey: "feedback", 
-      header: "Feedback", 
-      cell: info => (
-        <div style={{ whiteSpace: 'pre-line' }}>
-          {(info.getValue() as string) || ''}
-        </div>
-      )
-    },
-  ];
+  const columns = React.useMemo<ColumnDef<Student>[]>(
+    () => [
+      {
+        id: 'select',
+        header: () => null,
+        cell: ({ row }) => {
+          const isCurrentlySelected = selectedStudent === row.original.name;
+          return (
+            <input
+              type="checkbox"
+              checked={selectedStudents.has(row.original.name)}
+              onChange={(e) => {
+                const studentName = row.original.name;
+                setSelectedStudents(prev => {
+                  const newSet = new Set(prev);
+                  if (e.target.checked) {
+                    newSet.add(studentName);
+                  } else {
+                    newSet.delete(studentName);
+                  }
+                  return newSet;
+                });
+                if (isCurrentlySelected && !e.target.checked) {
+                  onStudentSelect('');
+                } else if (e.target.checked && selectedStudents.size === 0) {
+                  onStudentSelect(studentName);
+                }
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="table-container"
+            />
+          );
+        },
+        enableSorting: false,
+      },
+      { accessorKey: "name", header: "Name", cell: info => info.getValue() },
+      { accessorKey: "email", header: "Email", cell: info => info.getValue() },
+      {
+        accessorKey: "grade",
+        header: "Grade",
+        cell: info => info.getValue() || '',
+        sortingFn: (rowA, rowB) =>
+          parseInt(rowA.original.grade || '0') - parseInt(rowB.original.grade || '0'),
+      },
+      { 
+        accessorKey: "feedback", 
+        header: "Feedback", 
+        cell: info => (
+          <div style={{ whiteSpace: 'pre-line', lineHeight: '1.2' }}>
+            {((info.getValue() as string) || '').split('\n\n').join('\n')}
+          </div>
+        )
+      },
+    ],
+    [selectedStudents, onStudentSelect, setSelectedStudents]
+  );
 
   const table = useReactTable({
     data: students,
     columns,
-    state: { sorting },
-    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    onSortingChange: setSorting,
   });
+
+  // Update selectedStudent reference
+  const setSelectedStudent = (student: string | null) => {
+    if (student === null || student === '') {
+      onStudentSelect('');
+    } else {
+      onStudentSelect(student);
+    }
+  };
 
   // Update the handleSaveProgress function to enable auto-save
   const handleSaveProgress = async () => {
@@ -828,10 +878,10 @@ const StudentList: React.FC<{
               <TableHeaderComponent headerGroups={table.getHeaderGroups()} />
               <TableBodyComponent
                 rows={table.getRowModel().rows}
-                selectedStudent={selectedStudent}
-                onStudentSelect={onStudentSelect}
+                selectedStudents={selectedStudents}
+                setSelectedStudents={setSelectedStudents}
+                onStudentSelect={setSelectedStudent}
                 selectedFeedbackId={selectedFeedbackId}
-                onStudentModified={markChanges}
               />
             </Table>
           </div>

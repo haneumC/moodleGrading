@@ -51,6 +51,7 @@ export const useCSVHandling = (
         grade: '',
         feedback: '',
         appliedIds: [],
+        maxGrade: '',
       };
 
       headerRow.forEach((header, index) => {
@@ -60,6 +61,7 @@ export const useCSVHandling = (
           case 'Email address': student.email = value; break;
           case 'Grade': student.grade = value; break;
           case 'Feedback comments': student.feedback = value; break;
+          case 'Maximum Grade': student.maxGrade = value; break;
           // Add other fields as needed
         }
       });

@@ -75,12 +75,15 @@ type MoodleStudent = {
   appliedIds?: number[];
   onlineText?: string;
   lastModifiedGrade?: string;
+  maxGrade?: string;
+  gradeCanBeChanged?: string;
 }
 
 const MainApp = () => {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
   const [assignmentName, setAssignmentName] = useState<string>("Assignment 1");
   const [feedbackItems, setFeedbackItems] = useState<FeedbackItem[]>(defaultFeedback);
   
@@ -88,6 +91,7 @@ const MainApp = () => {
   const [isChangeHistoryVisible, setIsChangeHistoryVisible] = useState(false);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState<string>('');
   const [selectedFeedbackId, setSelectedFeedbackId] = useState<number | null>(null);
+  const [fileHandle, setFileHandle] = useState<FileSystemFileHandle | null>(null);
 
   useEffect(() => {
     // Check chrome.storage.local for data
@@ -113,8 +117,8 @@ const MainApp = () => {
                 lastModifiedSubmission: student.lastModifiedSubmission || '',
                 onlineText: student.onlineText || '',
                 lastModifiedGrade: student.lastModifiedGrade || '',
-                maxGrade: '20.00',
-                gradeCanBeChanged: 'Yes'
+                maxGrade: student.maxGrade || '20.00',
+                gradeCanBeChanged: student.gradeCanBeChanged || 'Yes'
               }));
               
               console.log('Setting students state with:', transformedStudents);
@@ -146,6 +150,7 @@ const MainApp = () => {
           const handle = await root.getFileHandle(handleId);
           if (handle) {
             console.log('File handle restored successfully');
+            setFileHandle(handle);
           }
         } catch (err) {
           console.error('Could not restore file handle:', err);
@@ -154,6 +159,14 @@ const MainApp = () => {
       });
     }
   }, []);
+
+  useEffect(() => {
+    if (fileHandle) {
+      console.log('File handle updated:', fileHandle);
+      // Store the file handle ID for future sessions
+      localStorage.setItem(SAVE_HANDLE_KEY, fileHandle.name);
+    }
+  }, [fileHandle]);
 
   const handleChangeTracked = (change: ChangeRecord) => {
     // Only track grade and feedback changes, ignore auto-saves
@@ -221,14 +234,15 @@ const MainApp = () => {
       prevStudents.map(student => {
         if (Array.isArray(student.appliedIds) && student.appliedIds.includes(oldFeedback.id)) {
           const updatedFeedback = student.feedback
-            .split('\n\n')
+            .split('\n')
             .map(line => {
               if (line.trim().startsWith(`${oldFeedback.comment.trim()}`)) {
                 return `${newFeedback.comment.trim()}`;
               }
               return line;
             })
-            .join('\n\n');
+            .filter(line => line.trim() !== '')
+            .join('\n');
 
           const totalDeduction = student.appliedIds.reduce((sum, id) => {
             if (id === oldFeedback.id) {
@@ -238,15 +252,32 @@ const MainApp = () => {
             return sum + (feedback?.grade || 0);
           }, 0);
 
-          const newGrade = Math.max(0, 20 - totalDeduction);
+          const maxPoints = parseFloat(student.maxGrade || '20.00');
+          const newGrade = Math.max(0, maxPoints - totalDeduction);
 
           window.dispatchEvent(new CustomEvent('grading-change'));
           
-          return {
+          const oldState = {
+            grade: student.grade,
+            feedback: student.feedback,
+            appliedIds: [...student.appliedIds]
+          };
+
+          const newState = {
             ...student,
             feedback: updatedFeedback,
-            grade: newGrade.toString(),
+            grade: updatedFeedback.trim() ? newGrade.toString() : '',
           };
+
+          handleChangeTracked({
+            type: 'feedback',
+            studentName: student.name,
+            oldValue: oldState,
+            newValue: newState,
+            timestamp: new Date().toISOString()
+          });
+
+          return newState;
         }
         return student;
       })
@@ -284,18 +315,28 @@ const MainApp = () => {
         About Us
       </button>
 
-      <div className="changes-section absolute top-16 right-4">
+      <div className="changes-section absolute top-16 right-4 flex flex-col gap-2">
         <button 
           onClick={() => setIsChangeHistoryVisible(!isChangeHistoryVisible)}
-          className="text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-between"
+          className="text-white hover:text-gray-200 px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 transition-colors flex items-center justify-between w-full"
         >
           <span>{isChangeHistoryVisible ? 'Hide Changes' : 'Show Changes'}</span>
           <span className="bg-gray-700 px-2 py-0.5 rounded-full text-sm">
             {changeHistory.length}
           </span>
         </button>
+
+        <a 
+          href="https://youtu.be/your-video-id" 
+          target="_blank" 
+          rel="noopener noreferrer"
+          className="text-blue-500 hover:text-blue-400 flex items-center gap-1"
+        >
+          <i className="bi bi-play-circle text-lg"></i>
+          <span>Watch Tutorial</span>
+        </a>
         
-        {/* Display the last auto-save time below the Show Changes button */}
+        {/* Display the last auto-save time below all buttons */}
         {lastAutoSaveTime && (
           <div className="last-autosave-header">
             Last auto-save: {lastAutoSaveTime}
@@ -315,21 +356,34 @@ const MainApp = () => {
       {/* Main content */}
       <header>
         <div>
-          <h1>Grading Assistant</h1>
+          <div className="flex items-center gap-2">
+            <h1>Grading Assistant</h1>
+            <span className="text-xs text-gray-400">v1.0.0</span>
+          </div>
           <input
             type="text"
             value={assignmentName}
             onChange={(e) => setAssignmentName(e.target.value)}
             className="text-lg font-semibold px-2 py-1 border rounded"
           />
-          <p>Max Points: 20.00</p>
+          <p>Max Points: {students.length > 0 ? (students[0]?.maxGrade || '20.00') : '-'}</p>
         </div>
       </header>
       <main>
         <div className="left">
           <Feedback
             selectedStudent={selectedStudent}
-            appliedIds={students.find(s => s.name === selectedStudent)?.appliedIds || []}
+            selectedStudents={selectedStudents}
+            appliedIds={
+              selectedStudent
+                ? students.find(s => s.name === selectedStudent)?.appliedIds || []
+                : selectedStudents.size > 0
+                  ? [...selectedStudents].reduce((ids, studentName) => {
+                      const student = students.find(s => s.name === studentName);
+                      return student?.appliedIds ? [...ids, ...student.appliedIds] : ids;
+                    }, [] as number[])
+                  : []
+            }
             onFeedbackEdit={handleFeedbackEdit}
             feedbackItems={feedbackItems}
             setFeedbackItems={setFeedbackItems}
@@ -346,6 +400,8 @@ const MainApp = () => {
             setStudents={setStudents}
             selectedStudent={selectedStudent}
             onStudentSelect={setSelectedStudent}
+            selectedStudents={selectedStudents}
+            setSelectedStudents={setSelectedStudents}
             assignmentName={assignmentName}
             setAssignmentName={setAssignmentName}
             onChangeTracked={handleChangeTracked}
@@ -353,9 +409,7 @@ const MainApp = () => {
             setFeedbackItems={setFeedbackItems}
             onLastAutoSaveTimeUpdate={setLastAutoSaveTime}
             selectedFeedbackId={selectedFeedbackId}
-            onFileHandleCreated={(handle) => {
-              console.log('File handle created:', handle);
-            }}
+            onFileHandleCreated={setFileHandle}
           />
         </div>
       </main>

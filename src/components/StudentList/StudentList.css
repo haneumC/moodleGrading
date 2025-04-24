@@ -96,9 +96,14 @@
   white-space: nowrap;
 }
 
+/* Column widths */
 .table-container th:nth-child(1),
 .table-container td:nth-child(1) {
-  width: 25%;
+  width: 40px;
+  padding-left: 8px;
+  padding-right: 8px;
+  min-width: 40px;
+  max-width: 40px;
 }
 
 .table-container th:nth-child(2),
@@ -108,12 +113,12 @@
 
 .table-container th:nth-child(3),
 .table-container td:nth-child(3) {
-  width: 15%;
+  width: 25%;
 }
 
 .table-container th:nth-child(4),
 .table-container td:nth-child(4) {
-  width: 30%;
+  width: 15%;
 }
 
 .table-container th:nth-child(5),
