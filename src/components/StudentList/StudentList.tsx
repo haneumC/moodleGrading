@@ -142,10 +142,11 @@ const StudentList: React.FC<{
   // Check for Moodle data when component mounts
   useEffect(() => {
     const moodleData = getImportedMoodleData();
-    if (moodleData) {
-      setStudents(moodleData);
-      // Optionally set assignment name if you have it in your state
-      // setAssignmentName(decodeURIComponent(moodleData.assignmentName));
+    if (moodleData?.students) {
+      setStudents(moodleData.students);
+      if (moodleData.assignmentName) {
+        setAssignmentName(moodleData.assignmentName);
+      }
     }
     
     // Try to restore file handle from previous session
