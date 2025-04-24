@@ -12,12 +12,13 @@ interface MoodleImportStudent {
   onlineText?: string;
   lastModifiedGrade?: string;
   gradeCanBeChanged?: string;
+  maxGrade?: string;
 }
 
 interface MoodleImportData {
   students: Student[];
   assignmentName?: string;
-  maxGrade?: string;
+  maxGrade: string;
 }
 
 export function getImportedMoodleData(): MoodleImportData | null {
@@ -28,16 +29,8 @@ export function getImportedMoodleData(): MoodleImportData | null {
     const parsedData = JSON.parse(data) as MoodleImportData;
     if (!parsedData || !Array.isArray(parsedData.students)) return null;
 
-    // Extract max grade from the first student's grade field
-    let maxGrade = '20.00'; // Default value
-    const firstGradeCell = document.querySelector('input[name^="quickgrade"]');
-    if (firstGradeCell) {
-      const gradeText = firstGradeCell.closest('td')?.textContent || '';
-      const maxGradeMatch = gradeText.match(/\/\s*(\d+(?:\.\d+)?)/);
-      if (maxGradeMatch) {
-        maxGrade = maxGradeMatch[1];
-      }
-    }
+    // Use the max grade from the imported data
+    const maxGrade = parsedData.maxGrade || '100.00';
 
     // Transform the data
     const transformedStudents: Student[] = parsedData.students.map((student: MoodleImportStudent) => ({
