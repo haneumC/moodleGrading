@@ -309,7 +309,6 @@ const MainApp = () => {
             return sum + (feedback?.grade || 0);
           }, 0);
 
-          const maxPoints = parseFloat(student.maxGrade || '20.00');
           const newGrade = Math.max(0, maxPoints - totalDeduction);
 
           window.dispatchEvent(new CustomEvent('grading-change'));
@@ -444,11 +443,11 @@ const MainApp = () => {
             onFeedbackEdit={handleFeedbackEdit}
             feedbackItems={feedbackItems}
             setFeedbackItems={setFeedbackItems}
-            students={students}
             onStudentsUpdate={setStudents}
             onChangeTracked={handleChangeTracked}
             onFeedbackSelect={handleFeedbackSelect}
             selectedFeedbackId={selectedFeedbackId}
+            maxPoints={maxPoints}
           />
         </div>
         <div className="right">

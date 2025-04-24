@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import 'bootstrap-icons/font/bootstrap-icons.css';
-import { FeedbackItem, SortField, SortDirection, FeedbackProps } from './types';
+import { FeedbackItem, SortField, SortDirection } from './types';
+import { Student, ChangeRecord } from '@/components/StudentList/types';
 import {
   DndContext,
   closestCenter,
@@ -35,7 +36,6 @@ import {
   restrictToParentElement,
 } from '@dnd-kit/modifiers';
 import { Search, X } from 'lucide-react';
-import { ChangeRecord } from '@/components/StudentList/types';
 
 interface SortableItemProps {
   id: number;
@@ -256,17 +256,32 @@ const SortableItem = ({
 const fadeInClass = "opacity-100 transform translate-y-0 transition-all duration-200 ease-out";
 const fadeOutClass = "opacity-0 transform -translate-y-2 transition-all duration-200 ease-out";
 
-const Feedback: React.FC<FeedbackProps> = ({ 
-  selectedStudent, 
+interface Props {
+  selectedStudent: string | null;
+  selectedStudents: Set<string>;
+  appliedIds: number[];
+  onFeedbackEdit: (oldFeedback: FeedbackItem, newFeedback: FeedbackItem) => void;
+  feedbackItems: FeedbackItem[];
+  setFeedbackItems: React.Dispatch<React.SetStateAction<FeedbackItem[]>>;
+  onStudentsUpdate: React.Dispatch<React.SetStateAction<Student[]>>;
+  onChangeTracked: (change: ChangeRecord) => void;
+  onFeedbackSelect: (feedbackId: number | null) => void;
+  selectedFeedbackId: number | null;
+  maxPoints: number;
+}
+
+const Feedback: React.FC<Props> = ({
+  selectedStudent,
   selectedStudents,
-  appliedIds, 
+  appliedIds,
   onFeedbackEdit,
   feedbackItems,
   setFeedbackItems,
   onStudentsUpdate,
   onChangeTracked,
   onFeedbackSelect,
-  selectedFeedbackId
+  selectedFeedbackId,
+  maxPoints
 }) => {
   const [isAddingFeedback, setIsAddingFeedback] = useState(false);
   const [newFeedback, setNewFeedback] = useState<Omit<FeedbackItem, 'id' | 'applied'>>({ 
@@ -309,7 +324,6 @@ const Feedback: React.FC<FeedbackProps> = ({
 
           let newAppliedIds: number[];
           let newFeedback: string;
-          let newGrade: string;
 
           if (isAlreadyApplied) {
             // Remove the feedback
@@ -332,11 +346,11 @@ const Feedback: React.FC<FeedbackProps> = ({
             return sum + (feedback?.grade || 0);
           }, 0);
 
-          const maxPoints = parseFloat(student.maxGrade || '20.00');
+          // Use maxPoints prop instead of hardcoded value
           const calculatedGrade = Math.max(0, maxPoints - totalDeduction);
           
           // Set grade to blank if no feedback is applied
-          newGrade = newAppliedIds.length > 0 ? calculatedGrade.toString() : '';
+          const newGrade = newAppliedIds.length > 0 ? calculatedGrade.toString() : '';
 
           const oldState = {
             grade: student.grade,
@@ -447,7 +461,7 @@ const Feedback: React.FC<FeedbackProps> = ({
             
             const newState = {
               ...student,
-              grade: newAppliedIds.length === 0 ? "" : (20 - remainingDeduction).toString(),
+              grade: newAppliedIds.length === 0 ? "" : (maxPoints - remainingDeduction).toString(),
               feedback: feedbackLines || "",
               appliedIds: newAppliedIds,
             };
