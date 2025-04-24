@@ -106,16 +106,22 @@ const MainApp = () => {
         const parsedData = JSON.parse(decodeURIComponent(dataParam));
         console.log('Found URL data:', parsedData);
         
+        // Set max points first
         if (parsedData.maxPoints) {
           console.log('Setting max points from URL:', parsedData.maxPoints);
           setMaxPoints(parsedData.maxPoints);
         }
         
+        // Set assignment name
         if (parsedData.assignmentName) {
           setAssignmentName(parsedData.assignmentName);
         }
         
+        // Transform and set students data
         if (parsedData.students && Array.isArray(parsedData.students)) {
+          const maxPointsValue = parsedData.maxPoints || '20.00';
+          console.log('Using max points value for students:', maxPointsValue);
+          
           const transformedStudents = parsedData.students.map((student: MoodleStudent) => ({
             name: student.name || '',
             email: student.email || '',
@@ -128,10 +134,11 @@ const MainApp = () => {
             lastModifiedSubmission: student.lastModifiedSubmission || '',
             onlineText: student.onlineText || '',
             lastModifiedGrade: student.lastModifiedGrade || '',
-            maxGrade: parsedData.maxPoints || '20.00',
+            maxGrade: maxPointsValue,
             gradeCanBeChanged: student.gradeCanBeChanged || 'Yes'
           }));
           
+          console.log('Setting students with max points:', transformedStudents);
           setStudents(transformedStudents);
         }
       } catch (error) {
@@ -147,10 +154,10 @@ const MainApp = () => {
             const parsedData = result.moodleGradingData;
             console.log('Found Moodle data:', parsedData);
             
-            if (parsedData.maxPoints) {
-              console.log('Setting max points from storage:', parsedData.maxPoints);
-              setMaxPoints(parsedData.maxPoints);
-            }
+            // Set max points first
+            const maxPointsValue = parsedData.maxPoints || '20.00';
+            console.log('Setting max points from storage:', maxPointsValue);
+            setMaxPoints(maxPointsValue);
             
             if (parsedData.students && Array.isArray(parsedData.students)) {
               console.log('Found valid students array:', parsedData.students);
@@ -167,7 +174,7 @@ const MainApp = () => {
                 lastModifiedSubmission: student.lastModifiedSubmission || '',
                 onlineText: student.onlineText || '',
                 lastModifiedGrade: student.lastModifiedGrade || '',
-                maxGrade: parsedData.maxPoints || '20.00',
+                maxGrade: maxPointsValue,
                 gradeCanBeChanged: student.gradeCanBeChanged || 'Yes'
               }));
               
