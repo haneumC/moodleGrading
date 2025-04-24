@@ -383,7 +383,7 @@ const MainApp = () => {
         </button>
 
         <a 
-          href="https://youtu.be/your-video-id" 
+          href="https://www.calvin.edu" 
           target="_blank" 
           rel="noopener noreferrer"
           className="text-blue-500 hover:text-blue-400 flex items-center gap-1"
