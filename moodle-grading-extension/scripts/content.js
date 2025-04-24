@@ -347,6 +347,18 @@ const init = (function() {
 
     console.log('Found grading page, adding button...');
     addGradingButton();
+    
+    // Check the Quick grading checkbox if it exists
+    const quickGradingCheckbox = document.querySelector('input[type="checkbox"][name="quickgrading"]');
+    if (quickGradingCheckbox && !quickGradingCheckbox.checked) {
+      quickGradingCheckbox.click();
+      // Trigger form submission to apply the quick grading setting
+      const form = quickGradingCheckbox.closest('form');
+      if (form) {
+        form.submit();
+      }
+    }
+    
     initialized = true;
   };
 })();
